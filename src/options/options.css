@@ -1,0 +1,408 @@
+/* General Styles for Options Page */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    margin: 0;
+    background-color: #f8f9fa; /* Slightly off-white for a calmer feel */
+    color: #333;
+    display: flex;
+    justify-content: center;
+    padding-top: 20px;
+    padding-bottom: 50px;
+}
+
+.container {
+    width: 100%;
+    max-width: 700px;
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+header {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+header h1 {
+    font-size: 1.8em;
+    color: #007bff; /* Clear Blue */
+    margin: 0;
+    text-align: center;
+}
+
+/* Main Content Sections */
+main section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+main section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+main section h2 {
+    font-size: 1.3em;
+    color: #fd7e14; /* Orange */
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+main section p {
+    font-size: 0.95em;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+label,
+input[type="checkbox"] + label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.95em;
+    color: #444;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+    width: calc(100% - 20px); /* Full width minus padding */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    font-family: inherit;
+    margin-bottom: 15px; /* Space below inputs */
+    box-sizing: border-box;
+    transition: border-color 0.2s ease-in-out;
+}
+
+textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+    background-color: #007bff; /* Blue for primary actions */
+    color: white;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+/* Specific Section Styling */
+
+/* API Keys */
+#api-key-inputs .api-key-group {
+    margin-bottom: 15px;
+}
+#api-key-inputs .api-key-group label {
+    font-weight: normal; /* Less emphasis than section label */
+    color: #333;
+}
+
+/* General Settings */
+#general-settings-section div {
+    margin-bottom: 15px;
+}
+
+/* Quick Queries Management */
+#quick-queries-list .quick-query-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background-color: #f9f9f9;
+}
+
+#quick-queries-list .quick-query-item .details span {
+    display: block;
+}
+
+#quick-queries-list .quick-query-item .details .name {
+    font-weight: bold;
+    color: #007bff;
+}
+#quick-queries-list .quick-query-item .details .query-text {
+    font-size: 0.9em;
+    color: #666;
+    max-height: 40px; /* Limit height */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+
+#quick-queries-list .quick-query-item .actions button {
+    background-color: transparent;
+    color: #dc3545; /* Red for delete */
+    border: 1px solid #dc3545;
+    padding: 5px 10px;
+    font-size: 0.85em;
+    margin-left: 5px;
+}
+
+#quick-queries-list .quick-query-item .actions button.edit {
+    color: #ffc107; /* Yellow for edit */
+    border-color: #ffc107;
+}
+
+#quick-queries-list .quick-query-item .actions button:hover {
+    background-color: #f8d7da; /* Light red for delete hover */
+    color: #721c24;
+}
+#quick-queries-list .quick-query-item .actions button.edit:hover {
+    background-color: #fff3cd; /* Light yellow for edit hover */
+    color: #856404;
+}
+
+.add-quick-query-form {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    background-color: #fdfdfd;
+}
+
+.add-quick-query-form input[type="text"],
+.add-quick-query-form textarea {
+    margin-bottom: 10px;
+}
+
+.add-quick-query-form button {
+    background-color: #28a745; /* Green for add action */
+    color: white;
+}
+
+.add-quick-query-form button:hover {
+    background-color: #218838;
+}
+
+/* Quick Contexts Management */
+#quick-contexts-list .quick-context-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background-color: #f9f9f9;
+}
+
+#quick-contexts-list .quick-context-item .details span {
+    display: block;
+}
+
+#quick-contexts-list .quick-context-item .details .name {
+    font-weight: bold;
+    color: #007bff;
+}
+#quick-contexts-list .quick-context-item .details .context-text {
+    font-size: 0.9em;
+    color: #666;
+    max-height: 40px; /* Limit height */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+#quick-contexts-list .quick-context-item .actions button {
+    background-color: transparent;
+    color: #dc3545; /* Red for delete */
+    border: 1px solid #dc3545;
+    padding: 5px 10px;
+    font-size: 0.85em;
+    margin-left: 5px;
+}
+
+#quick-contexts-list .quick-context-item .actions button.edit {
+    color: #ffc107; /* Yellow for edit */
+    border-color: #ffc107;
+}
+
+#quick-contexts-list .quick-context-item .actions button:hover {
+    background-color: #f8d7da; /* Light red for delete hover */
+    color: #721c24;
+}
+#quick-contexts-list .quick-context-item .actions button.edit:hover {
+    background-color: #fff3cd; /* Light yellow for edit hover */
+    color: #856404;
+}
+
+.add-quick-context-form {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    background-color: #fdfdfd;
+}
+
+.add-quick-context-form input[type="text"],
+.add-quick-context-form textarea {
+    margin-bottom: 10px;
+}
+
+.add-quick-context-form button {
+    background-color: #28a745; /* Green for add action */
+    color: white;
+}
+
+.add-quick-context-form button:hover {
+    background-color: #218838;
+}
+
+/* Debug Settings */
+#debug-settings-section input[type="checkbox"] {
+    margin-right: 8px;
+    vertical-align: middle;
+}
+#debug-settings-section label[for="debug-mode-enabled"] {
+    display: inline-block; /* Align with checkbox */
+    font-weight: normal;
+}
+
+#mock-ai-response-area {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+#mock-ai-response-area .info-text {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 5px;
+    margin-bottom: 0;
+}
+
+/* Footer */
+footer {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#status-message {
+    font-size: 0.9em;
+    color: #28a745; /* Green for success messages */
+    min-height: 20px; /* Reserve space */
+}
+
+#status-message.error {
+    color: #dc3545; /* Red for error messages */
+}
+
+/* Utility for hidden elements */
+.hidden {
+    display: none !important;
+}
+
+/* Greyed out for disabled models in select */
+select option:disabled {
+    color: #aaa;
+    background-color: #f0f0f0;
+}
+
+/* Styles for API Key Instructions */
+details {
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: bold;
+    list-style: none; /* Remove default triangle/arrow */
+    position: relative;
+}
+
+/* Add a custom arrow icon */
+summary::before {
+    content: '▼'; /* Unicode for down arrow */
+    position: absolute;
+    right: 10px;
+    top: 0;
+    transition: transform 0.2s ease-in-out;
+}
+
+details[open] > summary::before {
+    transform: rotate(180deg); /* Rotate arrow when open */
+}
+
+.instructions-content {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.instructions-content h3 {
+    margin-top: 0;
+}
+
+.instructions-content ol {
+    margin-left: 20px;
+    padding-left: 0;
+}
+
+.instructions-content li {
+    margin-bottom: 8px;
+}
+
+.instructions-content a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.instructions-content a:hover {
+    text-decoration: underline;
+}
+
+.instructions-content hr {
+    margin: 15px 0;
+    border: 0;
+    border-top: 1px solid #eee;
+}
+
+/* Basic reset for spacing within instructions */
+.instructions-content p, .instructions-content ol, .instructions-content ul {
+    margin-bottom: 10px;
+}
+
+.instructions-content p:last-child, .instructions-content ol:last-child, .instructions-content ul:last-child {
+    margin-bottom: 0;
+} 

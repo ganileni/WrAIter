@@ -1,0 +1,399 @@
+/* General Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    margin: 0;
+    background-color: #ffffff;
+    color: #333;
+    width: 400px; /* Fixed width for the popup */
+    overflow-x: hidden;
+}
+
+.container {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+header h1 {
+    font-size: 1.4em;
+    color: #007bff; /* Clear Blue */
+    margin: 0;
+}
+
+/* Style for the main application title */
+.app-title {
+    font-size: 2em; /* Make title bigger */
+    font-weight: bold;
+}
+
+/* Style for the colored 'AI' part of the title */
+.ai-color {
+    color: #fd7e14; /* Orange color */
+}
+
+#settings-button {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: #007bff;
+    padding: 5px;
+}
+#settings-button:hover {
+    color: #0056b3;
+}
+
+/* Main Content Sections */
+main section {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #555;
+}
+
+textarea,
+select {
+    width: calc(100% - 12px); /* Account for padding */
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95em;
+    font-family: inherit;
+    box-sizing: border-box; /* Ensures padding doesn't add to width */
+    transition: border-color 0.2s ease-in-out;
+}
+
+textarea:focus,
+select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+#request-changes-button {
+    background-color: #fd7e14; /* Orange */
+    color: white;
+    width: 100%;
+}
+
+#request-changes-button:hover {
+    background-color: #e66a00;
+}
+
+/* Quick Queries */
+#quick-queries-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#quick-queries-buttons button {
+    background-color: #e9ecef;
+    color: #007bff;
+    border: 1px solid #007bff;
+    font-size: 0.85em;
+    padding: 6px 10px;
+}
+
+#quick-queries-buttons button:hover {
+    background-color: #d0d9e0;
+    border-color: #0056b3;
+}
+
+/* Context Section */
+#context-section details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #007bff;
+    margin-bottom: 5px;
+}
+
+#context-section details summary:hover {
+    color: #0056b3;
+}
+
+/* Quick Contexts */
+#quick-contexts-section {
+    margin-bottom: 10px;
+}
+
+.quick-contexts-container {
+    margin-bottom: 10px;
+}
+
+#quick-contexts-dropdown {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+}
+
+#quick-contexts-dropdown option:checked {
+    background-color: #007bff;
+    color: white;
+}
+
+.context-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#add-to-quick-contexts-button {
+    background-color: #28a745;
+    color: white;
+    font-size: 0.85em;
+    padding: 6px 10px;
+    align-self: flex-start;
+}
+
+#add-to-quick-contexts-button:hover {
+    background-color: #218838;
+}
+
+/* Model Selection */
+.model-selection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.model-selection label {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.model-selection select {
+    flex-grow: 1;
+}
+
+/* Request Controls */
+.request-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* Adjust margin to match model-selection or remove if gap is sufficient */
+    /* margin-bottom: 10px; */
+}
+
+.request-controls .num-suggestions-selection {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Space between label and input */
+}
+
+.request-controls .num-suggestions-selection label {
+     margin-bottom: 0;
+}
+
+.request-controls .num-suggestions-selection input[type="number"] {
+     width: 50px; /* Give the number input a fixed width */
+     padding: 5px;
+     text-align: center;
+}
+
+.request-controls #request-changes-button {
+    /* Remove width: 100%; */
+    width: auto;
+    flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+/* Suggestions Section */
+#suggestions-section h2 {
+    font-size: 1.1em;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+#suggestions-container .suggestion {
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+#suggestions-container .suggestion textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 80px;
+}
+
+#suggestions-container .suggestion-item-actions {
+    margin-top: 8px;
+    text-align: right;
+}
+
+#suggestions-container .suggestion-item-actions button {
+    font-size: 0.8em;
+    padding: 5px 8px;
+    margin-left: 5px;
+}
+
+#suggestions-container .suggestion-item-actions .accept-apply {
+    background-color: #fd7e14; /* Orange */
+    color: white;
+}
+
+#suggestions-container .suggestion-item-actions .accept-apply:hover {
+    background-color: #e66a00;
+}
+
+#suggestions-container .suggestion-item-actions .accept-reedit {
+    background-color: #007bff; /* Blue */
+    color: white;
+}
+
+#suggestions-container .suggestion-item-actions .accept-reedit:hover {
+    background-color: #0056b3;
+}
+
+/* Action Buttons (Apply, Query Again) */
+#action-buttons-section {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+#action-buttons-section button {
+    flex-grow: 1;
+}
+
+#apply-changes-button {
+    background-color: #007bff;
+    color: white;
+}
+#apply-changes-button:hover {
+    background-color: #0056b3;
+}
+#apply-changes-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+#query-again-button {
+    background-color: #6c757d;
+    color: white;
+}
+#query-again-button:hover {
+    background-color: #545b62;
+}
+
+/* Footer */
+footer {
+    display: flex;
+    justify-content: space-between; /* Distributes space between flex items */
+    align-items: center; /* Vertically aligns items in the center */
+    margin-top: 15px; /* Add some space above the footer */
+    padding-top: 10px; /* Add some padding inside the footer */
+    border-top: 1px solid #eee; /* Add a subtle line above the footer */
+    font-size: 0.9em; /* Make the footer text slightly smaller */
+    color: #555; /* Darken the text color slightly */
+}
+
+footer p {
+    margin: 0; /* Remove default paragraph margin */
+}
+
+footer a {
+    text-decoration: none; /* Remove underline from the link */
+    color: #007bff; /* Set link color */
+}
+
+footer a:hover {
+    text-decoration: underline; /* Add underline on hover */
+}
+
+/* Animations (Subtle) */
+details summary::marker {
+    transition: transform 0.2s ease-in-out;
+}
+
+details[open] summary::marker {
+    transform: rotate(90deg);
+}
+
+/* Utility for hidden elements */
+.hidden {
+    display: none !important;
+}
+
+/* Greyed out for disabled models */
+select option:disabled {
+    color: #aaa;
+    background-color: #f0f0f0;
+}
+
+/* Custom Dropdown Styles */
+.custom-dropdown {
+    position: relative;
+    flex-grow: 1;
+}
+.dropdown-selected {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    user-select: none;
+}
+.dropdown-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+.dropdown-options.hidden {
+    display: none;
+}
+.dropdown-option {
+    padding: 8px;
+    font-size: 0.9em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dropdown-option.disabled {
+    color: #aaa;
+    cursor: not-allowed;
+}
+.dropdown-option:hover:not(.disabled) {
+    background-color: #f0f0f0;
+} 

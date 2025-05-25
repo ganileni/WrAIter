@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WrAIter Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>WrAIter Settings</h1>
+        </header>
+
+        <main>
+            <section id="api-keys-section">
+                <h2>API Keys</h2>
+                <p>Enter your API keys for the desired AI models. Keys are stored locally and securely.</p>
+                <div id="api-key-inputs">
+                    <!-- API key inputs will be dynamically generated here -->
+                </div>
+
+                <details>
+                    <summary>How to Get a Gemini API Key</summary>
+                     <div class="instructions-content">
+                        <h3>How to Get a Gemini API Key</h3>
+<p>To get a Gemini API key from Google, follow these steps:</p>
+<ol>
+<li><strong>Log in to your Google account</strong><br>Make sure you are signed in to your Google account.</li>
+<li><strong>Open Google AI Studio</strong><br>Go to <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank">Google AI Studio</a> or search for "Google AI Studio Gemini API".</li>
+<li><strong>Access the Gemini API section</strong><br>In AI Studio, find the "Gemini API" tab or the button labelled "Get API key in Google AI Studio".</li>
+<li><strong>Create and copy your API key</strong><br>Click "Create API Key." Approve the terms of service if prompted. Your new API key will be displayed—copy and save it securely.</li>
+</ol>
+<p><strong>Free Plan Note:</strong><br>Google offers a free tier for Gemini API usage, but it comes with rate limits. They are more than enough for personal use with WrAIter.</p>
+<p><strong>Official Documentation:</strong><br>For more details and usage examples, visit the <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank">Gemini API documentation</a>.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>How to Get an OpenAI API Key</summary>
+                    <div class="instructions-content">
+                        <h3>How to Get an OpenAI API Key</h3>
+<p>To obtain an OpenAI API key, follow these steps:</p>
+<ol>
+<li><strong>Create or log in to your OpenAI account</strong><br>Visit the <a href="https://platform.openai.com/" target="_blank">OpenAI Platform</a> and sign up or log in with your credentials.</li>
+<li><strong>Navigate to the API section</strong><br>Once logged in, click your profile icon in the top right corner and select "API Keys" or "Manage API Keys" from the dropdown menu.</li>
+<li><strong>Create a new API key</strong><br>Click the "Create new secret key" button. You can name your key for easier management. Once generated, copy and securely store the key—OpenAI will only show it once.</li>
+<li><strong>Add credits to your account</strong><br>If you are a new user, you may need to add payment information and purchase credits before the API key becomes active for usage.</li>
+</ol>
+<p><strong>Security Reminder:</strong><br>Never share your API key publicly or expose it in client-side code. Keep it in a secure, server-side environment.</p>
+<p><strong>Official Documentation:</strong><br>For detailed instructions and best practices, refer to the <a href="https://platform.openai.com/docs/api-reference/introduction" target="_blank">OpenAI API documentation</a>.</p>
+<hr>
+                    </div>
+                </details>
+
+                <button id="save-api-keys-button">Save API Keys</button>
+            </section>
+
+            <section id="general-settings-section">
+                <h2>General Settings</h2>
+                <div>
+                    <label for="default-model-selector">Default AI Model:</label>
+                    <select id="default-model-selector">
+                        <!-- AI Models will be populated here -->
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <input type="checkbox" id="shortcut-enabled">
+                    <label for="shortcut-enabled">Enable Keyboard Shortcut (Ctrl+Shift+E)</label>
+                    <p class="info-text">You can change the key combination for the shortcut in your Chrome extensions settings (<a href="#" id="shortcuts-link">chrome://extensions/shortcuts</a>).</p>
+                </div>
+                <div class="setting-item">
+                    <input type="checkbox" id="context-menu-item-enabled">
+                    <label for="context-menu-item-enabled">Enable Context Menu Item ('Edit with WrAIter')</label>
+                    <p class="info-text">Shows an option in the right-click menu when editable text is selected.</p>
+                </div>
+                <button id="save-general-settings-button">Save General Settings</button>
+            </section>
+
+            <section id="quick-queries-management-section">
+                <h2>Manage Quick Queries</h2>
+                <p>Add, remove, or rename your quick query shortcuts.</p>
+                <div id="quick-queries-list">
+                    <!-- List of quick queries for management -->
+                </div>
+                <div class="add-quick-query-form">
+                    <input type="text" id="new-quick-query-name" placeholder="Button Name (e.g., Make Shorter)">
+                    <textarea id="new-quick-query-text" placeholder="Full query text (e.g., Make this text significantly shorter and more concise.)"></textarea>
+                    <button id="add-quick-query-button">Add Quick Query</button>
+                </div>
+                <div class="reset-quick-queries">
+                    <button id="reset-quick-queries-button">Reset Quick Queries to Defaults</button>
+                </div>
+            </section>
+
+            <section id="quick-contexts-management-section">
+                <h2>Manage Quick Contexts</h2>
+                <p>Add, remove, or rename your quick context shortcuts.</p>
+                <div id="quick-contexts-list">
+                    <!-- List of quick contexts for management -->
+                </div>
+                <div class="add-quick-context-form">
+                    <input type="text" id="new-quick-context-name" placeholder="Context Name (e.g., British English)">
+                    <textarea id="new-quick-context-text" placeholder="Context description (e.g., Exclusively use British English spelling.)"></textarea>
+                    <button id="add-quick-context-button">Add Quick Context</button>
+                </div>
+                <div class="reset-quick-contexts">
+                    <button id="reset-quick-contexts-button">Reset Quick Contexts to Defaults</button>
+                </div>
+            </section>
+
+            <section id="debug-settings-section">
+                <h2>Debugging</h2>
+                <div>
+                    <input type="checkbox" id="debug-mode-enabled">
+                    <label for="debug-mode-enabled">Enable Debug Mode</label>
+                </div>
+                <div id="mock-ai-response-area" class="hidden">
+                    <label for="mock-ai-suggestion">Mock AI Suggestion (for N=1):</label>
+                    <textarea id="mock-ai-suggestion" rows="3" placeholder="This is a mock AI response."></textarea>
+                     <p class="info-text">When debug mode is on and N=1, the extension will use this text instead of calling an actual AI. For N > 1, it will generate N copies of this mock text.</p>
+                </div>
+                <button id="save-debug-settings-button">Save Debug Settings</button>
+            </section>
+
+        </main>
+        <footer>
+            <p id="status-message"></p>
+        </footer>
+    </div>
+    <!-- Script will be injected by Webpack -->
+</body>
+</html> 

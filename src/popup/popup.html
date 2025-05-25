@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WrAIter Popup</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img id="logo-icon" src="assets/icons/icon48.png" alt="WrAIter Logo">
+            <h1 class="app-title">Wr<span class="ai-color">AI</span>ter</h1>
+            <button id="settings-button" title="Settings">
+                <!-- Gear icon will be placed here (e.g., SVG or font icon) -->
+                ⚙️
+            </button>
+        </header>
+
+        <main>
+            <section id="scratchpad-section">
+                <label for="scratchpad">Selected Text:</label>
+                <textarea id="scratchpad" rows="5"></textarea>
+            </section>
+
+            <section id="query-section">
+                <label for="query">Your Request:</label>
+                <textarea id="query" rows="3" placeholder="e.g., Make this more concise"></textarea>
+            </section>
+
+            <section id="quick-queries-section">
+                <label>Quick Queries:</label>
+                <div id="quick-queries-buttons">
+                    <!-- Buttons will be dynamically added here -->
+                </div>
+            </section>
+
+            <section id="context-section">
+                <details>
+                    <summary>Add Context (Optional)</summary>
+                    <div id="quick-contexts-section">
+                        <label for="quick-contexts-dropdown" style="color: #666; font-style: italic;">Quick Contexts: (Ctrl+click to select multiple)</label>
+                        <div class="quick-contexts-container">
+                            <select id="quick-contexts-dropdown" multiple size="3">
+                                <!-- Quick context options will be dynamically added here -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="context-input-container">
+                        <label for="quick-contexts-dropdown">More Context:</label>
+                        <textarea id="context" rows="3" placeholder="Provide additional context for the AI..."></textarea>
+                        <button id="add-to-quick-contexts-button" type="button" title="Add current context as a quick context">+ Add to Quick Contexts</button>
+                    </div>
+                </details>
+            </section>
+
+            <section id="controls-section">
+                <div class="model-selection">
+                    <label>AI Model:</label>
+                    <div class="custom-dropdown" id="model-selector">
+                        <div class="dropdown-selected" id="model-selected">Loading models...</div>
+                        <div class="dropdown-options hidden" id="model-options">
+                            <!-- Custom model options will be populated here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="request-controls">
+                    <button id="request-changes-button">Request Changes</button>
+                    <div class="num-suggestions-selection">
+                        <label for="num-suggestions-popup">how many:</label>
+                        <input type="number" id="num-suggestions-popup" name="num-suggestions-popup" min="1" max="5" value="2">
+                    </div>
+                </div>
+            </section>
+
+            <section id="suggestions-section" style="display: none;">
+                <h2>Suggestions:</h2>
+                <div id="suggestions-container">
+                    <!-- AI suggestions will be displayed here -->
+                </div>
+            </section>
+
+            <section id="action-buttons-section" style="display: none;">
+                 <button id="apply-changes-button" disabled>Apply Changes</button>
+                 <button id="query-again-button">Query Again</button>
+            </section>
+        </main>
+
+        <footer>
+            <p>Tokens Used: <span id="token-count">0</span> <span id="reset-token-count" style="cursor: pointer; text-decoration: underline; color: blue;">Reset</span></p>
+            <a href="https://buymeacoffee.com/orazioa" title="If you like this extension, buy me a coffee :)" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+        </footer>
+    </div>
+    <!-- The script will be injected by Webpack -->
+</body>
+</html> 
