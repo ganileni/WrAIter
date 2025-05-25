@@ -1,6 +1,7 @@
 # WrAIter Chrome Extension
 
-![WrAIter Logo](src/assets/icons/icon128.png)
+![WrAIter Logo](src/assets/chrome-web-store/small-promo-title.png)
+![Wraiter demo](src/assets/demo.gif)
 
 ## Introduction
 
@@ -19,6 +20,16 @@ WrAIter is a Chrome browser extension designed to enhance text editing on any we
 1.  Install dependencies: `npm install`
 2.  Development mode: `npm run watch`
 3.  Production build: `npm run build`
+
+### Load as Unpacked Extension in Chrome
+
+After building the extension with `npm`:
+
+1.  Open Chrome and navigate to `chrome://extensions/`.
+2.  Enable "Developer mode" by toggling the switch in the top right corner.
+3.  Click the "Load unpacked" button in the top left corner.
+4.  Select the `dist` folder from your project directory.
+5.  The extension should now appear in your list of extensions and be ready to use.
 
 ## Development
 
@@ -44,7 +55,7 @@ WrAIter/
 │   ├── shared/                # Shared utilities
 │   └── manifest.json          # Extension manifest
 ├── .gitignore
-├── AGENT.md
+├── AGENTS.md
 ├── package.json
 ├── package-lock.json
 └── webpack.config.js
