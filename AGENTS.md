@@ -351,6 +351,7 @@ WrAIter/
 │   └── manifest.json           # Extension manifest file
 ├── .gitignore
 ├── AGENT.md                    # This file
+├── MANUAL.html                 # User manual file (generated from MANUAL.md)
 ├── package.json
 ├── package-lock.json
 └── webpack.config.js           # Webpack configuration

@@ -81,4 +81,4 @@ WrAIter/
 
 ## License
 
-[License information to be added] 
+[MIT License](LICENSE)

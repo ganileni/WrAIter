@@ -490,6 +490,14 @@ function openOptionsPage() {
 }
 
 /**
+ * Opens the user manual in a new tab.
+ */
+function openUserManual() {
+    const manualUrl = chrome.runtime.getURL('MANUAL.html');
+    chrome.tabs.create({ url: manualUrl });
+}
+
+/**
  * Handles adding current context text as a new quick context.
  */
 async function handleAddToQuickContexts() {
@@ -532,6 +540,7 @@ async function handleAddToQuickContexts() {
 document.addEventListener('DOMContentLoaded', initPopup);
 requestChangesButton.addEventListener('click', handleRequestChanges);
 settingsButton.addEventListener('click', openOptionsPage);
+document.getElementById('manual-button').addEventListener('click', openUserManual);
 addToQuickContextsButton.addEventListener('click', handleAddToQuickContexts);
 
 // Get the reset token count element
