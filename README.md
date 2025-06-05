@@ -9,6 +9,10 @@ WrAIter is a Chrome browser extension designed to enhance text editing on any we
 
 ## Installation
 
+You can install WrAIter from [its page on the Chrome web store](https://chromewebstore.google.com/detail/fclnkaiackldaedlhbgijnphgjiipgdk).
+
+## Installation from source
+
 ### Prerequisites
 
 -   Node.js and npm
