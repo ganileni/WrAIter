@@ -1,5 +1,7 @@
 # WrAIter Chrome Extension
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ganileni/WrAIter)
+
 ![WrAIter Logo](src/assets/chrome-web-store/small-promo-title.png)
 ![Wraiter demo](src/assets/demo.gif)
 
