@@ -1,28 +1,82 @@
 // WrAIter - ai_service.js
 // This module handles interactions with various AI APIs.
 
-// --- Supported AI Models --- (Source of Truth for model details)
-// Each model includes its ID (used in selectors and API calls),
-// a user-friendly name, and the provider (e.g., 'gemini', 'openai').
-const SUPPORTED_AI_MODELS = [
-    // Gemini Models
-    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", description: "Fast and versatile multimodal model for scaling across diverse tasks.", provider: "gemini", tokensPerMinute: 1000000, requestsPerMinute: 60 },
-    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Mid-size multimodal model optimized for complex reasoning tasks.", provider: "gemini", tokensPerMinute: 2000000, requestsPerMinute: 10 },
-    { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro", description: "Balanced performance for moderate reasoning tasks.", provider: "gemini", tokensPerMinute: 1000000, requestsPerMinute: 60 },
-    // Gemini 2.5 Preview Models
-    { id: "gemini-2.5-flash-preview-05-20", name: "Gemini 2.5 Flash Preview 05-20", description: "Preview model showcasing adaptive thinking and cost efficiency.", provider: "gemini", tokensPerMinute: 1000000, requestsPerMinute: 60 },
-    { id: "gemini-2.5-pro-preview-05-06", name: "Gemini 2.5 Pro Preview 05-06", description: "Powerful reasoning model capable of complex problem-solving and long-context understanding.", provider: "gemini", tokensPerMinute: 2000000, requestsPerMinute: 10 },
-    // OpenAI Models - Using common model names, actual IDs for API might vary slightly (e.g. gpt-3.5-turbo-0125)
-    { id: "gpt-4o", name: "OpenAI GPT-4o", description: "Multimodal model supporting text, audio, images, and video for advanced reasoning.", provider: "openai", tokensPerMinute: 600000, requestsPerMinute: 5000 },
-    { id: "gpt-4-turbo", name: "OpenAI GPT-4 Turbo", description: "Optimized for low latency and high throughput across diverse tasks.", provider: "openai", tokensPerMinute: 600000, requestsPerMinute: 5000 },
-];
+/**
+ * Fetches available models from OpenAI API.
+ * @param {string} apiKey The OpenAI API key.
+ * @returns {Promise<Array<Object>>} A promise that resolves to an array of model objects.
+ */
+export async function fetchOpenAIModels(apiKey) {
+    if (!apiKey) {
+        throw new Error("OpenAI API key is required to fetch models.");
+    }
+
+    try {
+        const response = await fetch("https://api.openai.com/v1/models", {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenAI API error: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Transform OpenAI model format to our internal format
+        return data.data.map(model => ({
+            id: model.id,
+            name: model.id, // OpenAI doesn't provide friendly names, use ID
+            description: `OpenAI model (created: ${new Date(model.created * 1000).toLocaleDateString()})`,
+            provider: "openai",
+            created: model.created,
+            owned_by: model.owned_by
+        }));
+    } catch (error) {
+        console.error("Error fetching OpenAI models:", error);
+        throw error;
+    }
+}
 
 /**
- * Returns the list of supported AI models.
- * @returns {Array<Object>} List of model objects.
+ * Fetches available models from Gemini API.
+ * @param {string} apiKey The Gemini API key.
+ * @returns {Promise<Array<Object>>} A promise that resolves to an array of model objects.
  */
-export function getSupportedAIModels() {
-    return SUPPORTED_AI_MODELS;
+export async function fetchGeminiModels(apiKey) {
+    if (!apiKey) {
+        throw new Error("Gemini API key is required to fetch models.");
+    }
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+
+        if (!response.ok) {
+            throw new Error(`Gemini API error: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Transform Gemini model format to our internal format
+        return data.models
+            .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
+            .map(model => {
+                // Extract model ID from the full name (e.g., "models/gemini-pro" -> "gemini-pro")
+                const modelId = model.name.replace('models/', '');
+                return {
+                    id: modelId,
+                    name: model.displayName || modelId,
+                    description: model.description || "Google Gemini model",
+                    provider: "gemini",
+                    supportedGenerationMethods: model.supportedGenerationMethods
+                };
+            });
+    } catch (error) {
+        console.error("Error fetching Gemini models:", error);
+        throw error;
+    }
 }
 
 /**
@@ -30,7 +84,7 @@ export function getSupportedAIModels() {
  * @param {string} text The original text to modify.
  * @param {string} query The user's request for changes.
  * @param {string} context Additional context for the AI.
- * @param {Object} modelInfo The selected AI model object (from getSupportedAIModels).
+ * @param {Object} modelInfo The selected AI model object (must include id and provider).
  * @param {string} apiKey The API key for the selected model's provider.
  * @param {number} n The number of suggestions to generate.
  * @param {string|null} mockSuggestion If provided, returns this as a mock suggestion (for debug mode).

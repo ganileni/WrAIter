@@ -77,6 +77,65 @@
                 <button id="save-general-settings-button">Save General Settings</button>
             </section>
 
+            <section id="model-management-section">
+                <h2>Manage AI Models</h2>
+                <p>Refresh and select which AI models appear in the extension.</p>
+                
+                <div class="model-refresh-controls">
+                    <button id="refresh-models-button">🔄 Refresh Available Models</button>
+                    <span id="model-refresh-status"></span>
+                </div>
+
+                <details id="model-filters-details">
+                    <summary>Advanced: Model Filters (Regex)</summary>
+                    <div class="model-filters-content">
+                        <p class="info-text">Use regex patterns to filter which models appear when refreshing. Leave empty to show all models.</p>
+                        
+                        <h4>Gemini Filters</h4>
+                        <div class="filter-group">
+                            <label for="gemini-include-regex">Include Pattern:</label>
+                            <input type="text" id="gemini-include-regex" placeholder="e.g., gemini-(1\.5|2\.0)" />
+                            <p class="info-text">Only models matching this pattern will be included.</p>
+                        </div>
+                        <div class="filter-group">
+                            <label for="gemini-exclude-regex">Exclude Pattern:</label>
+                            <input type="text" id="gemini-exclude-regex" placeholder="e.g., -exp-|-latest$" />
+                            <p class="info-text">Models matching this pattern will be excluded.</p>
+                        </div>
+
+                        <h4>OpenAI Filters</h4>
+                        <div class="filter-group">
+                            <label for="openai-include-regex">Include Pattern:</label>
+                            <input type="text" id="openai-include-regex" placeholder="e.g., ^(gpt-4|gpt-3\.5)" />
+                            <p class="info-text">Only models matching this pattern will be included.</p>
+                        </div>
+                        <div class="filter-group">
+                            <label for="openai-exclude-regex">Exclude Pattern:</label>
+                            <input type="text" id="openai-exclude-regex" placeholder="e.g., embed|whisper|tts" />
+                            <p class="info-text">Models matching this pattern will be excluded.</p>
+                        </div>
+
+                        <button id="save-model-filters-button">Save Filters</button>
+                        <button id="reset-model-filters-button">Reset to Defaults</button>
+                        
+                        <h4>Filtered Model IDs</h4>
+                        <div class="filter-group">
+                            <label for="filtered-model-ids-display">Model IDs (green = included, red = excluded):</label>
+                            <div id="filtered-model-ids-display" class="model-ids-display" placeholder="Refresh models to see filtered IDs here..."></div>
+                            <p class="info-text">This shows all model IDs: <span style="color: #28a745;">green = included</span>, <span style="color: #dc3545;">red = excluded</span>. Useful for fine-tuning regex patterns.</p>
+                        </div>
+                    </div>
+                </details>
+
+                <div id="available-models-section">
+                    <h3>Available Models</h3>
+                    <p class="info-text">Select which models to make available in the extension. Only checked models will appear in the model selector.</p>
+                    <div id="available-models-list">
+                        <!-- Model checkboxes will be dynamically generated here -->
+                    </div>
+                </div>
+            </section>
+
             <section id="quick-queries-management-section">
                 <h2>Manage Quick Queries</h2>
                 <p>Add, remove, or rename your quick query shortcuts.</p>

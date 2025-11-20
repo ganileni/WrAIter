@@ -2,7 +2,8 @@
 // This script handles the functionality of the extension's options page.
 
 import './options.css';
-import { DEFAULT_QUICK_QUERIES, DEFAULT_QUICK_CONTEXTS } from '../shared/defaults.js';
+import { DEFAULT_QUICK_QUERIES, DEFAULT_QUICK_CONTEXTS, DEFAULT_MODEL_FILTERS } from '../shared/defaults.js';
+import { fetchOpenAIModels, fetchGeminiModels } from '../shared/ai_service.js';
 
 // DOM Elements
 const apiKeyInputsContainer = document.getElementById('api-key-inputs');
@@ -26,6 +27,16 @@ const resetQuickQueriesButton = document.getElementById('reset-quick-queries-but
 const resetQuickContextsButton = document.getElementById('reset-quick-contexts-button');
 const shortcutEnabledCheckbox = document.getElementById('shortcut-enabled');
 const contextMenuItemEnabledCheckbox = document.getElementById('context-menu-item-enabled');
+const refreshModelsButton = document.getElementById('refresh-models-button');
+const modelRefreshStatus = document.getElementById('model-refresh-status');
+const geminiIncludeRegexInput = document.getElementById('gemini-include-regex');
+const geminiExcludeRegexInput = document.getElementById('gemini-exclude-regex');
+const openaiIncludeRegexInput = document.getElementById('openai-include-regex');
+const openaiExcludeRegexInput = document.getElementById('openai-exclude-regex');
+const saveModelFiltersButton = document.getElementById('save-model-filters-button');
+const resetModelFiltersButton = document.getElementById('reset-model-filters-button');
+const availableModelsList = document.getElementById('available-models-list');
+const filteredModelIdsDisplay = document.getElementById('filtered-model-ids-display');
 
 // Supported AI model providers and their user-friendly names
 // This should ideally come from a shared source with background.js or ai_service.js
@@ -39,6 +50,12 @@ const AI_PROVIDERS = {
 let currentQuickQueries = [];
 // To store currently loaded quick contexts for editing/deleting
 let currentQuickContexts = [];
+// To store currently available models
+let currentAvailableModels = [];
+// To store enabled model IDs
+let currentEnabledModels = [];
+// To store excluded model IDs for display (persists in memory until next refresh)
+let currentExcludedModelIds = [];
 
 /**
  * Initializes the options page.
@@ -49,6 +66,8 @@ async function initOptions() {
     console.log("WrAIter: Options page opened");
     await loadApiKeys();
     await loadGeneralSettings();
+    await loadModelFilters();
+    await loadAvailableModels();
     await loadQuickQueries();
     await loadQuickContexts();
     await loadDebugSettings();
@@ -121,6 +140,20 @@ async function saveApiKeys() {
         await chrome.storage.sync.set({ apiKeys });
         showStatusMessage("API keys saved successfully!");
         console.log("WrAIter: API Keys saved:", apiKeys);
+        const hasAnyKey = Object.values(apiKeys).some(key => key);
+        if (hasAnyKey) {
+            await refreshAvailableModels();
+        } else {
+            await chrome.storage.sync.set({
+                availableModels: [],
+                enabledModels: [],
+                modelMetadata: {},
+                excludedModelIds: []
+            });
+            currentExcludedModelIds = [];
+            await loadAvailableModels();
+            showStatusMessage("All API keys cleared. Add a key via the gear icon to fetch models.", true);
+        }
         // Re-initialize model selectors as key availability might have changed
         initModelSelectors(); 
         // Inform popup to update its model selector if it's open
@@ -137,7 +170,7 @@ async function saveApiKeys() {
  */
 async function loadGeneralSettings() {
     const { defaultModel, isShortcutEnabled, isContextMenuItemEnabled } = await chrome.storage.sync.get({
-        defaultModel: 'gemini-1.5-flash',
+        defaultModel: '',
         isShortcutEnabled: true,
         isContextMenuItemEnabled: true // Default to true
     });
@@ -175,16 +208,33 @@ async function saveGeneralSettings() {
 async function initModelSelectors() {
     console.log("WrAIter: Initializing model selectors on options page.");
     try {
-        const response = await chrome.runtime.sendMessage({ type: 'GET_SUPPORTED_MODELS' });
-        const supportedModels = response?.models || [];
-        const { apiKeys = {} } = await chrome.storage.sync.get('apiKeys');
+        // Get available model IDs and enabled models from storage
+        const { availableModels: modelIds = [], enabledModels = [], apiKeys = {}, modelMetadata = {} } = await chrome.storage.sync.get({
+            availableModels: [],
+            enabledModels: [],
+            apiKeys: {},
+            modelMetadata: {}
+        });
         const { defaultModel: savedDefaultModel } = await chrome.storage.sync.get('defaultModel');
+
+        // Handle migration: if modelIds contains objects (old format), convert to new format
+        let idsToUse = modelIds;
+        if (modelIds.length > 0 && typeof modelIds[0] === 'object') {
+            // Old format detected - extract IDs
+            idsToUse = modelIds.map(m => m.id);
+        }
+
+        // Reconstruct model objects from IDs using stored metadata
+        const availableModels = buildModelsFromStorage(idsToUse, modelMetadata);
+
+        // Filter to only show enabled models
+        const modelsToShow = availableModels.filter(model => enabledModels.includes(model.id));
 
         defaultModelSelector.innerHTML = ''; // Clear existing options
 
-        if (supportedModels.length === 0) {
+        if (modelsToShow.length === 0) {
             const option = document.createElement('option');
-            option.textContent = "No models available";
+            option.textContent = "No models available. Add an API key via the gear icon and refresh.";
             option.disabled = true;
             defaultModelSelector.appendChild(option);
             console.warn("WrAIter: No AI models available for default model selector.");
@@ -193,7 +243,7 @@ async function initModelSelectors() {
 
         let firstEnabledOptionValue = null;
 
-        supportedModels.forEach(model => {
+        modelsToShow.forEach(model => {
             const option = document.createElement('option');
             option.value = model.id;
             option.textContent = model.name;
@@ -661,6 +711,526 @@ async function saveDebugSettings() {
     }
 }
 
+// --- Model Management ---
+/**
+ * Loads model filters from storage and populates the filter inputs.
+ */
+async function loadModelFilters() {
+    const { 
+        geminiIncludeRegex = DEFAULT_MODEL_FILTERS.geminiInclude,
+        geminiExcludeRegex = DEFAULT_MODEL_FILTERS.geminiExclude,
+        openaiIncludeRegex = DEFAULT_MODEL_FILTERS.openaiInclude,
+        openaiExcludeRegex = DEFAULT_MODEL_FILTERS.openaiExclude
+    } = await chrome.storage.sync.get({
+        geminiIncludeRegex: DEFAULT_MODEL_FILTERS.geminiInclude,
+        geminiExcludeRegex: DEFAULT_MODEL_FILTERS.geminiExclude,
+        openaiIncludeRegex: DEFAULT_MODEL_FILTERS.openaiInclude,
+        openaiExcludeRegex: DEFAULT_MODEL_FILTERS.openaiExclude
+    });
+
+    geminiIncludeRegexInput.value = geminiIncludeRegex;
+    geminiExcludeRegexInput.value = geminiExcludeRegex;
+    openaiIncludeRegexInput.value = openaiIncludeRegex;
+    openaiExcludeRegexInput.value = openaiExcludeRegex;
+    
+    // Update model IDs display if models are already loaded
+    // Use stored excluded IDs from memory (calculated during last refresh)
+    const { availableModels: modelIds = [] } = await chrome.storage.sync.get({ availableModels: [] });
+    if (modelIds.length > 0 && typeof modelIds[0] === 'string') {
+        updateModelIdsDisplay(modelIds, currentExcludedModelIds);
+    }
+    
+    console.log("WrAIter: Model filters loaded.");
+}
+
+/**
+ * Saves model filters to storage.
+ */
+async function saveModelFilters() {
+    const geminiIncludeRegex = geminiIncludeRegexInput.value.trim();
+    const geminiExcludeRegex = geminiExcludeRegexInput.value.trim();
+    const openaiIncludeRegex = openaiIncludeRegexInput.value.trim();
+    const openaiExcludeRegex = openaiExcludeRegexInput.value.trim();
+
+    try {
+        await chrome.storage.sync.set({
+            geminiIncludeRegex,
+            geminiExcludeRegex,
+            openaiIncludeRegex,
+            openaiExcludeRegex
+        });
+        showStatusMessage("Model filters saved successfully!");
+        console.log("WrAIter: Model filters saved.");
+        
+        // Update model IDs display if models are already loaded
+        // Use stored excluded IDs from memory (calculated during last refresh)
+        const { availableModels: modelIds = [] } = await chrome.storage.sync.get({ availableModels: [] });
+        if (modelIds.length > 0 && typeof modelIds[0] === 'string') {
+            updateModelIdsDisplay(modelIds, currentExcludedModelIds);
+        }
+    } catch (error) {
+        console.error("WrAIter: Error saving model filters:", error);
+        showStatusMessage("Error saving model filters: " + error.message, true);
+    }
+}
+
+/**
+ * Resets model filters to their default values.
+ */
+async function resetModelFilters() {
+    try {
+        await chrome.storage.sync.set({
+            geminiIncludeRegex: DEFAULT_MODEL_FILTERS.geminiInclude,
+            geminiExcludeRegex: DEFAULT_MODEL_FILTERS.geminiExclude,
+            openaiIncludeRegex: DEFAULT_MODEL_FILTERS.openaiInclude,
+            openaiExcludeRegex: DEFAULT_MODEL_FILTERS.openaiExclude
+        });
+        loadModelFilters();
+        showStatusMessage("Model filters reset to defaults.");
+        console.log("WrAIter: Model filters reset to defaults.");
+    } catch (error) {
+        console.error("WrAIter: Error resetting model filters:", error);
+        showStatusMessage("Error resetting model filters: " + error.message, true);
+    }
+}
+
+/**
+ * Updates the display of filtered model IDs in the regex section.
+ * @param {Array<string>} includedIds Array of model IDs that passed the filters (included).
+ * @param {Array<string>} excludedIds Array of model IDs that were filtered out (excluded).
+ */
+function updateModelIdsDisplay(includedIds, excludedIds = []) {
+    if (!filteredModelIdsDisplay) {
+        return;
+    }
+
+    if (includedIds.length === 0 && excludedIds.length === 0) {
+        filteredModelIdsDisplay.innerHTML = '<span class="model-id-placeholder">(No models fetched yet. Click "Refresh Available Models" to fetch them.)</span>';
+        return;
+    }
+
+    const fragments = [];
+    
+    // Add included models in green
+    if (includedIds.length > 0) {
+        includedIds.forEach((id, index) => {
+            const span = document.createElement('span');
+            span.className = 'model-id-included';
+            span.textContent = id;
+            fragments.push(span);
+            // Add line break after each included model
+            if (index < includedIds.length - 1 || excludedIds.length > 0) {
+                fragments.push(document.createTextNode('\n'));
+            }
+        });
+    }
+    
+    // Add excluded models in red
+    if (excludedIds.length > 0) {
+        excludedIds.forEach((id, index) => {
+            const span = document.createElement('span');
+            span.className = 'model-id-excluded';
+            span.textContent = id;
+            fragments.push(span);
+            // Add line break after each excluded model except the last
+            if (index < excludedIds.length - 1) {
+                fragments.push(document.createTextNode('\n'));
+            }
+        });
+    }
+
+    // Clear and add all fragments
+    filteredModelIdsDisplay.innerHTML = '';
+    fragments.forEach((fragment) => {
+        filteredModelIdsDisplay.appendChild(fragment);
+    });
+}
+
+/**
+ * Builds full model objects using IDs and stored metadata.
+ * Falls back to heuristics if metadata is missing.
+ * @param {Array<string>} modelIds
+ * @param {Object} metadata
+ * @returns {Array<Object>}
+ */
+function buildModelsFromStorage(modelIds, metadata = {}) {
+    return modelIds.map(id => {
+        const meta = metadata[id] || {};
+        let provider = meta.provider || inferProviderFromId(id);
+        return {
+            id,
+            name: meta.name || id,
+            description: meta.description || `Model ID: ${id}`,
+            provider
+        };
+    });
+}
+
+function inferProviderFromId(id = '') {
+    if (id.startsWith('gemini-') || id.startsWith('models/gemini-')) {
+        return 'gemini';
+    }
+    if (id.startsWith('gpt-') || id.includes('openai')) {
+        return 'openai';
+    }
+    return 'unknown';
+}
+
+/**
+ * Filters models based on regex patterns.
+ * @param {Array<Object>} models Array of model objects to filter.
+ * @param {string} provider Provider name ('gemini' or 'openai').
+ * @param {string} includePattern Regex pattern for inclusion.
+ * @param {string} excludePattern Regex pattern for exclusion.
+ * @returns {Array<Object>} Filtered models.
+ */
+function filterModels(models, provider, includePattern, excludePattern) {
+    let filtered = models;
+
+    // Apply include filter
+    if (includePattern) {
+        try {
+            const includeRegex = new RegExp(includePattern, 'i');
+            filtered = filtered.filter(model => includeRegex.test(model.id));
+        } catch (error) {
+            console.error(`Invalid include regex for ${provider}:`, error);
+            showStatusMessage(`Invalid include regex for ${provider}: ${error.message}`, true);
+        }
+    }
+
+    // Apply exclude filter
+    if (excludePattern) {
+        try {
+            const excludeRegex = new RegExp(excludePattern, 'i');
+            filtered = filtered.filter(model => !excludeRegex.test(model.id));
+        } catch (error) {
+            console.error(`Invalid exclude regex for ${provider}:`, error);
+            showStatusMessage(`Invalid exclude regex for ${provider}: ${error.message}`, true);
+        }
+    }
+
+    return filtered;
+}
+
+/**
+ * Refreshes available models from APIs and saves them to storage.
+ */
+async function refreshAvailableModels() {
+    modelRefreshStatus.textContent = "Fetching models...";
+    modelRefreshStatus.className = "";
+    refreshModelsButton.disabled = true;
+
+    try {
+        const { apiKeys = {} } = await chrome.storage.sync.get('apiKeys');
+        const {
+            geminiIncludeRegex,
+            geminiExcludeRegex,
+            openaiIncludeRegex,
+            openaiExcludeRegex
+        } = await chrome.storage.sync.get({
+            geminiIncludeRegex: DEFAULT_MODEL_FILTERS.geminiInclude,
+            geminiExcludeRegex: DEFAULT_MODEL_FILTERS.geminiExclude,
+            openaiIncludeRegex: DEFAULT_MODEL_FILTERS.openaiInclude,
+            openaiExcludeRegex: DEFAULT_MODEL_FILTERS.openaiExclude
+        });
+
+        const hasGeminiKey = Boolean(apiKeys.gemini);
+        const hasOpenAIKey = Boolean(apiKeys.openai);
+
+        if (!hasGeminiKey && !hasOpenAIKey) {
+            const message = "Add an API key first. Click the gear icon in the popup, open Options, add a key, then save and try again.";
+            modelRefreshStatus.textContent = message;
+            modelRefreshStatus.className = "error";
+            refreshModelsButton.disabled = false;
+            showStatusMessage(message, true);
+            return;
+        }
+
+        let allModels = [];
+        let allFetchedModels = []; // Track all models before filtering
+
+        // Fetch Gemini models if API key exists
+        if (apiKeys.gemini) {
+            try {
+                const geminiModels = await fetchGeminiModels(apiKeys.gemini);
+                allFetchedModels = allFetchedModels.concat(geminiModels);
+                const filteredGemini = filterModels(geminiModels, 'gemini', geminiIncludeRegex, geminiExcludeRegex);
+                allModels = allModels.concat(filteredGemini);
+                console.log(`WrAIter: Fetched ${filteredGemini.length} Gemini models (from ${geminiModels.length} total).`);
+            } catch (error) {
+                console.error("WrAIter: Error fetching Gemini models:", error);
+                showStatusMessage("Error fetching Gemini models: " + error.message, true);
+            }
+        }
+
+        // Fetch OpenAI models if API key exists
+        if (apiKeys.openai) {
+            try {
+                const openaiModels = await fetchOpenAIModels(apiKeys.openai);
+                allFetchedModels = allFetchedModels.concat(openaiModels);
+                const filteredOpenai = filterModels(openaiModels, 'openai', openaiIncludeRegex, openaiExcludeRegex);
+                allModels = allModels.concat(filteredOpenai);
+                console.log(`WrAIter: Fetched ${filteredOpenai.length} OpenAI models (from ${openaiModels.length} total).`);
+            } catch (error) {
+                console.error("WrAIter: Error fetching OpenAI models:", error);
+                showStatusMessage("Error fetching OpenAI models: " + error.message, true);
+            }
+        }
+
+        // Calculate included and excluded model IDs for display
+        const includedIds = allModels.map(m => m.id);
+        const allFetchedIds = allFetchedModels.map(m => m.id);
+        const excludedIds = allFetchedIds.filter(id => !includedIds.includes(id));
+
+        // Store excluded IDs in module variable so they persist when loadAvailableModels() is called
+        currentExcludedModelIds = excludedIds;
+
+        // console.log(`WrAIter: Display update - Included: ${includedIds.length}, Excluded: ${excludedIds.length}, Total fetched: ${allFetchedIds.length}`);
+        // console.log(`WrAIter: Sample included IDs:`, includedIds.slice(0, 3));
+        // console.log(`WrAIter: Sample all fetched IDs:`, allFetchedIds.slice(0, 5));
+        // if (excludedIds.length > 0) {
+        //     console.log(`WrAIter: Excluded model IDs (first 10):`, excludedIds.slice(0, 10));
+        //     console.log(`WrAIter: Total excluded: ${excludedIds.length}`);
+        // } else {
+        //     console.log(`WrAIter: WARNING - No excluded models found! All ${allFetchedIds.length} fetched models passed the filters.`);
+        // }
+
+        // Update the model IDs display BEFORE checking if allModels is empty
+        // This way we can show excluded models even if no models passed the filters
+        updateModelIdsDisplay(includedIds, excludedIds);
+
+        if (allModels.length === 0) {
+            modelRefreshStatus.textContent = "No models found. Check your API keys and filters.";
+            modelRefreshStatus.className = "error";
+            refreshModelsButton.disabled = false;
+            await chrome.storage.sync.set({ 
+                availableModels: [], 
+                modelMetadata: {}, 
+                enabledModels: [],
+                excludedModelIds: excludedIds
+            });
+            // Don't return here - we already updated the display above
+            // But we should still show the excluded models in the display
+            return;
+        }
+
+        // Extract IDs for storage and build minimal metadata
+        const modelIds = includedIds;
+        const modelMetadata = {};
+        allModels.forEach(model => {
+            modelMetadata[model.id] = {
+                name: model.name || model.id,
+                description: (model.description || '').slice(0, 200),
+                provider: model.provider || inferProviderFromId(model.id)
+            };
+        });
+
+        // Estimate size to stay under quota
+        const idsSize = JSON.stringify(modelIds).length;
+        const metadataSize = JSON.stringify(modelMetadata).length;
+        const totalSize = idsSize + metadataSize;
+        const maxSize = 7000; // Leave some margin under 8KB limit
+        
+        if (totalSize > maxSize) {
+            modelRefreshStatus.textContent = `Too many models (${modelIds.length}). Please use stricter regex filters to reduce the number.`;
+            modelRefreshStatus.className = "error";
+            refreshModelsButton.disabled = false;
+            showStatusMessage(`Too many models to save (${modelIds.length} models, ~${Math.round(totalSize/1024)}KB). Please tighten your regex filters.`, true);
+            return;
+        }
+
+        // Save IDs, metadata, and excluded IDs
+        try {
+            await chrome.storage.sync.set({ 
+                availableModels: modelIds,
+                modelMetadata,
+                excludedModelIds: excludedIds
+            });
+        } catch (error) {
+            if (error.message && error.message.includes('quota')) {
+                modelRefreshStatus.textContent = `Storage quota exceeded. Too many models (${modelIds.length}). Please use stricter regex filters.`;
+                modelRefreshStatus.className = "error";
+                refreshModelsButton.disabled = false;
+                showStatusMessage(`Too many models to save. Please tighten your regex filters to reduce the number of models.`, true);
+                return;
+            }
+            throw error; // Re-throw if it's a different error
+        }
+        
+        // Get currently enabled models to preserve selection
+        const { enabledModels = [] } = await chrome.storage.sync.get('enabledModels');
+        
+        // Auto-enable newly fetched models that aren't in the enabled list yet
+        const newEnabledModels = [...new Set([...enabledModels, ...modelIds])];
+        
+        // Check size of enabledModels too
+        const enabledSize = JSON.stringify(newEnabledModels).length;
+        if (enabledSize > maxSize) {
+            // If enabled models list is too large, only keep the intersection with available models
+            const trimmedEnabled = modelIds.filter(id => enabledModels.includes(id));
+            await chrome.storage.sync.set({ enabledModels: trimmedEnabled });
+            console.warn(`WrAIter: Enabled models list was too large, trimmed to match available models.`);
+        } else {
+            await chrome.storage.sync.set({ enabledModels: newEnabledModels });
+        }
+
+        modelRefreshStatus.textContent = `✓ Fetched ${allModels.length} models successfully!`;
+        modelRefreshStatus.className = "success";
+        
+        // Reload the models list
+        await loadAvailableModels();
+        
+        // Re-initialize model selectors to reflect new models
+        initModelSelectors();
+        
+        console.log("WrAIter: Models refreshed and saved:", modelIds);
+
+    } catch (error) {
+        console.error("WrAIter: Error refreshing models:", error);
+        modelRefreshStatus.textContent = "Error: " + error.message;
+        modelRefreshStatus.className = "error";
+    } finally {
+        refreshModelsButton.disabled = false;
+        // Clear status after 5 seconds
+        setTimeout(() => {
+            modelRefreshStatus.textContent = "";
+            modelRefreshStatus.className = "";
+        }, 5000);
+    }
+}
+
+/**
+ * Loads available models from storage and displays them.
+ */
+async function loadAvailableModels() {
+    const { availableModels: modelIds = [], enabledModels = [], modelMetadata = {}, excludedModelIds = [] } = await chrome.storage.sync.get({
+        availableModels: [],
+        enabledModels: [],
+        modelMetadata: {},
+        excludedModelIds: []
+    });
+    
+    // Handle migration: if modelIds contains objects (old format), convert to new format
+    let idsToUse = modelIds;
+    let metadataToUse = modelMetadata;
+    if (modelIds.length > 0 && typeof modelIds[0] === 'object') {
+        // Old format detected - migrate to new format (IDs + metadata)
+        idsToUse = modelIds.map(m => m.id);
+        metadataToUse = {};
+        modelIds.forEach(model => {
+            metadataToUse[model.id] = {
+                name: model.name || model.id,
+                description: model.description || '',
+                provider: model.provider || inferProviderFromId(model.id)
+            };
+        });
+        await chrome.storage.sync.set({ availableModels: idsToUse, modelMetadata: metadataToUse });
+        console.log("WrAIter: Migrated models from object format to IDs + metadata.");
+    }
+    
+    // Reconstruct model objects from IDs using metadata
+    currentAvailableModels = buildModelsFromStorage(idsToUse, metadataToUse);
+    currentEnabledModels = enabledModels;
+    
+    // Load excluded IDs from storage and update module variable
+    currentExcludedModelIds = excludedModelIds || [];
+    
+    // Update the model IDs display with both included and excluded IDs
+    updateModelIdsDisplay(idsToUse, currentExcludedModelIds);
+    
+    renderAvailableModelsList();
+    console.log("WrAIter: Available models loaded for management.");
+}
+
+/**
+ * Renders the list of available models with checkboxes.
+ */
+function renderAvailableModelsList() {
+    availableModelsList.innerHTML = '';
+
+    if (currentAvailableModels.length === 0) {
+        availableModelsList.innerHTML = '<p class="no-models-message">No models available. Click the gear icon in the popup, add an API key in Options, then refresh the list.</p>';
+        return;
+    }
+
+    // Group models by provider
+    const modelsByProvider = {};
+    currentAvailableModels.forEach(model => {
+        if (!modelsByProvider[model.provider]) {
+            modelsByProvider[model.provider] = [];
+        }
+        modelsByProvider[model.provider].push(model);
+    });
+
+    // Render each provider group
+    Object.keys(modelsByProvider).sort().forEach(provider => {
+        const providerDiv = document.createElement('div');
+        providerDiv.className = 'model-provider-group';
+
+        const providerTitle = document.createElement('h4');
+        providerTitle.textContent = AI_PROVIDERS[provider] || provider;
+        providerDiv.appendChild(providerTitle);
+
+        modelsByProvider[provider].forEach(model => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'model-checkbox-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `model-${model.id}`;
+            checkbox.value = model.id;
+            checkbox.checked = currentEnabledModels.includes(model.id);
+            checkbox.addEventListener('change', () => handleModelToggle(model.id, checkbox.checked));
+
+            const label = document.createElement('label');
+            label.setAttribute('for', `model-${model.id}`);
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'model-name';
+            nameSpan.textContent = model.name;
+            
+            const descSpan = document.createElement('span');
+            descSpan.className = 'model-description';
+            descSpan.textContent = model.description;
+
+            label.appendChild(nameSpan);
+            label.appendChild(descSpan);
+
+            itemDiv.appendChild(checkbox);
+            itemDiv.appendChild(label);
+            providerDiv.appendChild(itemDiv);
+        });
+
+        availableModelsList.appendChild(providerDiv);
+    });
+}
+
+/**
+ * Handles toggling of a model's enabled state.
+ * @param {string} modelId The model ID.
+ * @param {boolean} isEnabled Whether the model is enabled.
+ */
+async function handleModelToggle(modelId, isEnabled) {
+    if (isEnabled) {
+        if (!currentEnabledModels.includes(modelId)) {
+            currentEnabledModels.push(modelId);
+        }
+    } else {
+        currentEnabledModels = currentEnabledModels.filter(id => id !== modelId);
+    }
+
+    try {
+        await chrome.storage.sync.set({ enabledModels: currentEnabledModels });
+        console.log("WrAIter: Enabled models updated:", currentEnabledModels);
+        
+        // Re-initialize model selectors to reflect changes
+        initModelSelectors();
+    } catch (error) {
+        console.error("WrAIter: Error saving enabled models:", error);
+        showStatusMessage("Error updating model selection: " + error.message, true);
+    }
+}
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', initOptions);
 saveApiKeysButton.addEventListener('click', saveApiKeys);
@@ -670,6 +1240,9 @@ saveDebugSettingsButton.addEventListener('click', saveDebugSettings);
 resetQuickQueriesButton.addEventListener('click', resetQuickQueriesToDefaults);
 resetQuickContextsButton.addEventListener('click', resetQuickContextsToDefaults);
 addQuickContextButton.addEventListener('click', addQuickContext);
+refreshModelsButton.addEventListener('click', refreshAvailableModels);
+saveModelFiltersButton.addEventListener('click', saveModelFilters);
+resetModelFiltersButton.addEventListener('click', resetModelFilters);
 
 const shortcutsLink = document.getElementById('shortcuts-link');
 if (shortcutsLink) {

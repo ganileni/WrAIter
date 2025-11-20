@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WrAIter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered text editing assistant.",
   "commands": {
     "_execute_action": {
@@ -16,8 +16,7 @@
     "activeTab",
     "storage",
     "scripting",
-    "contextMenus",
-    "tabs"
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -22,6 +22,11 @@ const tokenCountSpan = document.getElementById('token-count');
 const settingsButton = document.getElementById('settings-button');
 const numSuggestionsInputPopup = document.getElementById('num-suggestions-popup');
 const suggestionsSection = document.getElementById('suggestions-section');
+const modelSelectorWrapper = document.getElementById('model-selector');
+const apiKeyModal = document.getElementById('api-key-modal');
+const apiKeyModalMessage = document.getElementById('api-key-modal-message');
+const apiKeyModalOpenButton = document.getElementById('api-key-modal-open-options');
+const apiKeyModalCloseButton = document.getElementById('api-key-modal-close');
 
 // State variables
 let currentSelectedText = "";
@@ -31,6 +36,10 @@ let currentQuickContexts = []; // To store quick contexts from storage
 
 // Custom dropdown state
 let selectedModelId = null;
+let cleanupModelDropdownListeners = null;
+let closeModelDropdown = null;
+let hasShownApiKeyDialog = false;
+let lastFocusedBeforeModal = null;
 
 /**
  * Initializes the popup when it's opened.
@@ -164,65 +173,109 @@ async function loadQuickContexts() {
  */
 async function initModelSelector() {
     console.log("WrAIter: Initializing custom model selector.");
-    const dropdown = document.getElementById('model-selector');
-    const selectedDiv = document.getElementById('model-selected');
+    const selectedButton = document.getElementById('model-selected');
     const optionsContainer = document.getElementById('model-options');
-    selectedDiv.textContent = 'Loading models...';
+
+    if (!selectedButton || !optionsContainer) {
+        console.warn("WrAIter: Model selector elements not found.");
+        return;
+    }
+
+    // Reset dropdown state
+    cleanupModelDropdownListeners?.();
+    cleanupModelDropdownListeners = null;
+    closeModelDropdown = null;
     optionsContainer.innerHTML = '';
+    optionsContainer.classList.add('hidden');
+    selectedButton.setAttribute('aria-expanded', 'false');
+    selectedButton.disabled = true;
+    selectedButton.innerHTML = buildDropdownSelectedMarkup('Loading models...');
+
     try {
         const response = await chrome.runtime.sendMessage({ type: 'GET_SUPPORTED_MODELS' });
         const supportedModels = response?.models || [];
         const { apiKeys = {} } = await chrome.storage.sync.get('apiKeys');
-        const { defaultModel = 'gemini-2.5-flash-preview-05-20' } = await chrome.storage.sync.get('defaultModel');
+        const { defaultModel = '' } = await chrome.storage.sync.get('defaultModel');
 
         if (supportedModels.length === 0) {
-            selectedDiv.textContent = 'No models available';
+            selectedButton.innerHTML = buildDropdownSelectedMarkup('No models available. Add an API key to begin.');
+            selectedButton.disabled = true;
+            showApiKeyDialog("No AI models are available yet. Click Open Options to add an API key, refresh the model list, then try again.");
             console.warn('WrAIter: No AI models available.');
             return;
         }
 
-        // Populate option elements
+        selectedButton.disabled = false;
+        optionsContainer.innerHTML = '';
+
+        // Helper to update selected display and persist choice
+        const selectModel = (id) => {
+            const modelInfo = supportedModels.find(m => m.id === id);
+            if (!modelInfo) {
+                return;
+            }
+            const descriptionHtml = modelInfo.description ? `<em>${modelInfo.description}</em>` : '';
+            selectedButton.innerHTML = buildDropdownSelectedMarkup(`<code><strong>${modelInfo.name}</strong></code> ${descriptionHtml}`);
+            selectedModelId = id;
+            chrome.storage.sync.set({ defaultModel: id });
+        };
+
         supportedModels.forEach(model => {
             const opt = document.createElement('div');
             opt.className = 'dropdown-option';
             opt.dataset.value = model.id;
+            opt.setAttribute('role', 'option');
+            opt.tabIndex = 0;
             opt.innerHTML = `<code><strong>${model.name}</strong></code> <em>${model.description || ''}</em>`;
-            if (!apiKeys[model.provider]) {
+
+            const apiKeyMissing = !apiKeys[model.provider];
+            if (apiKeyMissing) {
                 opt.classList.add('disabled');
                 opt.title = 'API key missing';
             }
-            opt.addEventListener('click', () => {
-                if (opt.classList.contains('disabled')) return;
+
+            const handleSelection = () => {
+                if (apiKeyMissing) {
+                    showApiKeyDialog(`The API key for ${model.provider.toUpperCase()} is missing. Click Open Options to add it.`, { force: true });
+                    return;
+                }
                 selectModel(model.id);
-                optionsContainer.classList.add('hidden');
+                closeModelDropdown?.();
+            };
+
+            opt.addEventListener('click', handleSelection);
+            opt.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleSelection();
+                }
             });
+
             optionsContainer.appendChild(opt);
         });
 
-        // Helper to update selected display and persist choice
-        function selectModel(id) {
-            const modelInfo = supportedModels.find(m => m.id === id);
-            if (!modelInfo) return;
-            selectedDiv.innerHTML = `<code><strong>${modelInfo.name}</strong></code> <em>${modelInfo.description || ''}</em>`;
-            selectedModelId = id;
-            chrome.storage.sync.set({ defaultModel: id });
-        }
-
         // Determine enabled models based on available API keys
         const enabledModels = supportedModels.filter(m => apiKeys[m.provider]);
-        const initial = enabledModels.find(m => m.id === defaultModel)?.id || enabledModels[0]?.id;
-        if (initial) selectModel(initial);
-        else selectedDiv.textContent = 'No valid model available, please set an API key in options.';
+        const initial = enabledModels.find(m => m.id === defaultModel)?.id
+            || enabledModels[0]?.id
+            || supportedModels[0]?.id;
 
-        // Toggle open/close
-        selectedDiv.addEventListener('click', () => {
-            optionsContainer.classList.toggle('hidden');
-        });
+        if (initial) {
+            selectModel(initial);
+        } else {
+            selectedButton.innerHTML = buildDropdownSelectedMarkup('No valid model available. Add an API key in Options.');
+            showApiKeyDialog("No valid AI model is available. Please add an API key in the Options page.", { force: false });
+        }
+
+        const interactions = setupModelDropdownInteractions(selectedButton, optionsContainer, modelSelectorWrapper);
+        cleanupModelDropdownListeners = interactions.dispose;
+        closeModelDropdown = interactions.close;
 
         console.log('WrAIter: Custom model selector initialized.');
     } catch (error) {
         console.error('WrAIter: Error initializing model selector:', error);
-        selectedDiv.textContent = 'Error loading models';
+        selectedButton.innerHTML = buildDropdownSelectedMarkup('Error loading models');
+        selectedButton.disabled = false;
     }
 }
 
@@ -250,7 +303,6 @@ async function handleRequestChanges() {
     const combinedContext = allContexts.join('\n');
     
     const selectedModel = selectedModelId;
-    const apiKeyPresent = !!selectedModel;
     const N = parseInt(numSuggestionsInputPopup.value, 10); // Get N from the new popup input
 
     if (!originalText || originalText === "No editable text selected." || scratchpad.disabled) {
@@ -261,8 +313,8 @@ async function handleRequestChanges() {
         alert("Please enter a query/request.");
         return;
     }
-    if (!selectedModel || !apiKeyPresent) {
-        alert("Please select a valid AI model with an API key set in options.");
+    if (!selectedModel) {
+        showApiKeyDialog("No AI model is currently selected. Click Open Options to add an API key, refresh the model list, then try again.", { force: true });
         return;
     }
     if (isNaN(N) || N < 1 || N > 5) {
@@ -449,10 +501,6 @@ function handleAcceptAndReedit(suggestionId) {
     scratchpad.value = suggestionToReedit.text;
     currentSelectedText = suggestionToReedit.text; // Keep state consistent
 
-    // Clear previous query and context for the new re-edit cycle
-    queryTextarea.value = "";
-    contextTextarea.value = "";
-
     // Clear the suggestions list and hide the suggestions container/action buttons
     currentSuggestions = [];
     preferredSuggestionId = null; // Reset preferred selection
@@ -487,6 +535,14 @@ async function updateTokenCountDisplay() {
  */
 function openOptionsPage() {
     chrome.runtime.openOptionsPage();
+}
+
+/**
+ * Opens the user manual in a new tab.
+ */
+function openUserManual() {
+    const manualUrl = chrome.runtime.getURL('MANUAL.html');
+    chrome.tabs.create({ url: manualUrl });
 }
 
 /**
@@ -528,10 +584,110 @@ async function handleAddToQuickContexts() {
     }
 }
 
+function setupModelDropdownInteractions(selectedButton, optionsContainer, wrapper) {
+    if (!selectedButton || !optionsContainer || !wrapper) {
+        return {
+            dispose: () => {},
+            close: () => {}
+        };
+    }
+
+    const openDropdown = () => {
+        wrapper.classList.add('open');
+        optionsContainer.classList.remove('hidden');
+        selectedButton.setAttribute('aria-expanded', 'true');
+    };
+
+    const closeDropdown = () => {
+        wrapper.classList.remove('open');
+        optionsContainer.classList.add('hidden');
+        selectedButton.setAttribute('aria-expanded', 'false');
+    };
+
+    const toggleDropdown = () => {
+        if (wrapper.classList.contains('open')) {
+            closeDropdown();
+        } else {
+            openDropdown();
+        }
+    };
+
+    const handleSelectedClick = (event) => {
+        event.stopPropagation();
+        toggleDropdown();
+    };
+
+    const handleSelectedKeydown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleDropdown();
+        } else if (event.key === 'Escape') {
+            closeDropdown();
+        }
+    };
+
+    const handleOutsideClick = (event) => {
+        if (!wrapper.contains(event.target)) {
+            closeDropdown();
+        }
+    };
+
+    selectedButton.addEventListener('click', handleSelectedClick);
+    selectedButton.addEventListener('keydown', handleSelectedKeydown);
+    document.addEventListener('click', handleOutsideClick);
+
+    return {
+        dispose: () => {
+            selectedButton.removeEventListener('click', handleSelectedClick);
+            selectedButton.removeEventListener('keydown', handleSelectedKeydown);
+            document.removeEventListener('click', handleOutsideClick);
+        },
+        close: closeDropdown
+    };
+}
+
+function buildDropdownSelectedMarkup(innerHtml) {
+    return `
+        <span class="dropdown-label">${innerHtml}</span>
+        <span class="dropdown-caret" aria-hidden="true">▾</span>
+    `;
+}
+
+function showApiKeyDialog(message, options = {}) {
+    const { force = false } = options;
+    if (!apiKeyModal || !apiKeyModalMessage) {
+        alert(message);
+        return;
+    }
+
+    if (!force && hasShownApiKeyDialog) {
+        return;
+    }
+
+    hasShownApiKeyDialog = true;
+    apiKeyModalMessage.textContent = message;
+    apiKeyModal.classList.remove('hidden');
+    apiKeyModal.setAttribute('aria-hidden', 'false');
+    lastFocusedBeforeModal = document.activeElement;
+    apiKeyModalOpenButton?.focus();
+}
+
+function hideApiKeyDialog() {
+    if (!apiKeyModal) {
+        return;
+    }
+    apiKeyModal.classList.add('hidden');
+    apiKeyModal.setAttribute('aria-hidden', 'true');
+    if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
+        lastFocusedBeforeModal.focus();
+    }
+}
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', initPopup);
 requestChangesButton.addEventListener('click', handleRequestChanges);
 settingsButton.addEventListener('click', openOptionsPage);
+document.getElementById('manual-button').addEventListener('click', openUserManual);
 addToQuickContextsButton.addEventListener('click', handleAddToQuickContexts);
 
 // Get the reset token count element
@@ -557,6 +713,28 @@ async function handleResetTokenCount() {
 if (resetTokenCountSpan) {
     resetTokenCountSpan.addEventListener('click', handleResetTokenCount);
 }
+
+if (apiKeyModalOpenButton) {
+    apiKeyModalOpenButton.addEventListener('click', () => {
+        openOptionsPage();
+        hideApiKeyDialog();
+    });
+}
+if (apiKeyModalCloseButton) {
+    apiKeyModalCloseButton.addEventListener('click', hideApiKeyDialog);
+}
+if (apiKeyModal) {
+    apiKeyModal.addEventListener('click', (event) => {
+        if (event.target === apiKeyModal) {
+            hideApiKeyDialog();
+        }
+    });
+}
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && apiKeyModal && !apiKeyModal.classList.contains('hidden')) {
+        hideApiKeyDialog();
+    }
+});
 
 // Listen for storage changes to update UI elements like quick queries or model status
 chrome.storage.onChanged.addListener((changes, namespace) => {

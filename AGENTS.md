@@ -31,6 +31,8 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
 
 4. **Customization Options**
    - API key management for different AI providers
+   - **Dynamic Model Management**: Refresh available models from OpenAI and Gemini APIs with regex filtering
+   - **Model Selection**: Choose which fetched models appear in the extension's model selector
    - Customizable quick queries
    - **Customizable quick contexts with full management (add, delete, reorder)**
    - Default model selection (initial default: Gemini 2.5 Flash Preview 05-20; persists last-used choice)
@@ -64,6 +66,7 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
 4. **Options Page (`options/`)**
    - Configuration interface
    - API key management
+   - **Model Management**: Refresh models from APIs, configure regex filters, enable/disable models
    - Quick query customization
    - **Quick context customization**
    - Debug settings
@@ -75,6 +78,7 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
    - Token counting
    - Model configuration
    - Model registry metadata: supports id, name, description, and provider for each AI model, including Gemini 2.5 preview variants and OpenAI models.
+   - **Model Fetching**: Functions to fetch available models from OpenAI and Gemini APIs (`fetchOpenAIModels`, `fetchGeminiModels`)
    - **Structured Output Implementation:**
      - Prompts are constructed to explicitly request a specific number of suggestions (`N`) and formatted as a JSON array (Gemini) or a JSON object with a "suggestions" key (OpenAI).
      - API calls are configured (`responseMimeType` for Gemini, `response_format` for OpenAI) to enforce JSON output.
@@ -116,6 +120,18 @@ The extension uses `chrome.storage.sync` to store user preferences and state. Th
 *   `isContextMenuItemEnabled`: Boolean indicating if the context menu item "Edit with WrAIter" is enabled.
 *   `lastUsedQuery`: String storing the query text from the last request in the popup.
 *   `lastUsedN`: Number storing the number of suggestions requested in the last popup request (integer between 1 and 5).
+*   `availableModels`: Array of model IDs (strings) that passed the regex filters. Full model objects are reconstructed from `modelMetadata`.
+    *   Example: `["gemini-1.5-flash", "gemini-1.5-pro", "gpt-4o"]`
+*   `modelMetadata`: Object mapping model IDs to their metadata (name, description, provider). Used to reconstruct full model objects from stored IDs.
+    *   Example: `{ "gemini-1.5-flash": { name: "Gemini 1.5 Flash", description: "...", provider: "gemini" } }`
+*   `enabledModels`: Array of model IDs that are enabled and should appear in the model selector.
+    *   Example: `["gemini-1.5-flash", "gpt-4o", "gpt-4-turbo"]`
+*   `excludedModelIds`: Array of model IDs that were fetched but excluded by the regex filters. Used for display purposes in the options page.
+    *   Example: `["gemini-1.0-pro-exp", "gpt-3.5-turbo-0301"]`
+*   `geminiIncludeRegex`: String containing regex pattern to filter which Gemini models to include when refreshing.
+*   `geminiExcludeRegex`: String containing regex pattern to filter which Gemini models to exclude when refreshing.
+*   `openaiIncludeRegex`: String containing regex pattern to filter which OpenAI models to include when refreshing.
+*   `openaiExcludeRegex`: String containing regex pattern to filter which OpenAI models to exclude when refreshing.
 
 ### Message Passing API
 
@@ -134,8 +150,8 @@ Here is a list of message types and their typical payloads/responses:
         *   Request: `{ type: 'APPLY_CHANGES', text: string }` - Requests the content script to apply the provided text to the page.
         *   Response: `{ success: boolean, error?: string }` - Indicates if the change was successfully applied.
     *   `type: 'GET_SUPPORTED_MODELS'`
-        *   Request: `{ type: 'GET_SUPPORTED_MODELS' }` - Requests the list of supported AI models.
-        *   Response: `{ models: Array<{ id: string, name: string, description: string, provider: string }> }` - The list of supported models.
+        *   Request: `{ type: 'GET_SUPPORTED_MODELS' }` - Requests the list of supported AI models (filtered by enabled models).
+        *   Response: `{ models: Array<{ id: string, name: string, description: string, provider: string }> }` - The list of enabled models.
     *   `type: 'GET_TOKEN_COUNT'`
         *   Request: `{ type: 'GET_TOKEN_COUNT' }` - Requests the current total token count.
         *   Response: `{ tokenCount: number }` - The total token count.
@@ -248,6 +264,17 @@ WrAIter/
 
 MIT license
 
+## Recent Updates (Nov 2025)
+
+- The hardcoded `getSupportedAIModels` registry was removed. Available models are now fetched dynamically from the provider APIs and stored as `availableModels` (ID list) plus a compact `modelMetadata` map containing only `name` and `provider` (description is trimmed).
+- On fresh install the model list is empty. Users must click the gear icon in the popup, add at least one API key in Options, save, and refresh the list. Saving API keys automatically triggers a refresh when any key is present; clearing keys wipes the model list.
+- The "Refresh Available Models" action now requires at least one API key. If none are set, the UI shows guidance to open the gear icon → Options and follow the manual.
+- Background/popup error messaging for missing keys points users to the gear icon instructions, ensuring consistent onboarding even when only a single provider key is configured.
+- Excluded model IDs (models fetched but filtered out by regex) are now stored in `excludedModelIds` and persist across page reloads. The filtered model IDs display in the options page shows included models in green and excluded models in red (with strikethrough) for power users to understand filter effects.
+- Popup AI model selector now uses an accessible custom dropdown (button + listbox) with outside-click closing to address cases where the menu could no longer be opened.
+- Missing API key warnings in the popup are routed through a reusable dialog that includes an "Open Options" shortcut, so users can jump straight to adding keys.
+- Accept-and-Reedit flow now keeps the existing query/context text so users can iteratively tweak prompts without retyping.
+
 # WrAIter Chrome Extension - Agent Notes
 
 Important note for agents making changes: After *every change* you must update AGENTS.md with the relevant information.
@@ -285,13 +312,23 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
 2.  **Options Page (`options.html`, `options.js`, `options.css`):**
     *   Allows users to configure API keys for AI models.
     *   Set `N` (number of alternative changes).
-    *   Manage "quick queries" (add/remove/rename).
+    *   **Model Management Section:**
+        *   `refreshAvailableModels()`: Fetches models from OpenAI and Gemini APIs, applies regex filters, and saves to storage.
+        *   `loadModelFilters()`: Loads regex filter patterns from storage.
+        *   `saveModelFilters()`: Saves regex filter patterns to storage.
+        *   `resetModelFilters()`: Resets filters to default values.
+        *   `filterModels()`: Applies include/exclude regex patterns to filter model lists.
+        *   `loadAvailableModels()`: Loads available models and enabled model IDs from storage.
+        *   `renderAvailableModelsList()`: Renders checkboxes for each available model, grouped by provider.
+        *   `handleModelToggle()`: Handles enabling/disabling individual models and updates storage.
+    *   Manage "quick queries" (add/remove/rename/reorder).
     *   Manage "quick contexts" (add/remove/rename/reorder).
     *   `manageQuickContexts()`: Handles UI for adding, removing, renaming, and reordering quick contexts.
     *   `saveQuickContexts()`: Saves quick contexts to `chrome.storage`.
     *   `toggleDebugMode()`: Enables/disables debug mode and saves the state.
     *   `saveMockSuggestion()`: Saves the mock AI suggestion if debug mode is on.
     *   `loadSettings()`: Loads all saved settings when the options page opens.
+    *   `initModelSelectors()`: Updated to use `availableModels` and `enabledModels` from storage instead of hardcoded list.
 
 3.  **Content Script (`content.js`):**
     *   Injects into web pages to interact with editable text fields.
@@ -307,6 +344,8 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
 5.  **AI Service Integration (`ai_service.js`):**
     *   A module responsible for making requests to various AI APIs (Gemini, OpenAI).
     *   Handles API key management and error handling for API calls.
+    *   `fetchOpenAIModels(apiKey)`: Fetches available models from OpenAI's `/v1/models` endpoint and transforms them into the extension's internal format.
+    *   `fetchGeminiModels(apiKey)`: Fetches available models from Gemini's `/v1beta/models` endpoint, filters to models supporting `generateContent`, and transforms them into the extension's internal format.
     *   `generateSuggestions(text, query, context, model, apiKey, n, mockSuggestion)`:
         *   If mockSuggestion is provided (debug mode), returns it.
         *   Otherwise, constructs the appropriate API request based on the `model`.
@@ -318,7 +357,16 @@ WrAIter is a Chrome browser extension that enhances text editing by providing AI
             *   **Gemini:** Configured API calls to use `responseMimeType: "application/json"` and defined a `responseSchema` for an array of strings. Parses the JSON response directly.
             *   **OpenAI:** Modified prompts to request a JSON object with a `"suggestions"` key containing an array of strings, wrapped in triple backticks. Configured API calls with `response_format: { type: "json_object" }` and `n: 1`. Parses the JSON string extracted from the response content.
             *   **Validation:** Both implementations include parsing and validation to ensure the response is in the expected JSON format and contains an array of strings. The code attempts to extract exactly `n` suggestions and pads with placeholders if fewer are received.
-    *   `getSupportedModels()`: Returns a list of supported AI model objects, each containing `id`, `name`, `description`, and `provider`, including Gemini 1.0, 1.5, 2.5 preview variants and OpenAI GPT-3.5 Turbo, GPT-4 Turbo, and GPT-4o.
+    *   `getSupportedModels()`: Returns a hardcoded list of supported AI model objects, each containing `id`, `name`, `description`, and `provider`, including Gemini 1.0, 1.5, 2.5 preview variants and OpenAI GPT-3.5 Turbo, GPT-4 Turbo, and GPT-4o. This is used as a fallback and for initial setup.
+
+6. **Defaults (`shared/defaults.js`):**
+    *   `DEFAULT_QUICK_QUERIES`: Array of default quick query objects.
+    *   `DEFAULT_QUICK_CONTEXTS`: Array of default quick context objects.
+    *   `DEFAULT_MODEL_FILTERS`: Object containing default regex patterns for filtering models:
+        *   `geminiInclude`: Include pattern for Gemini models (default: `"gemini-(1\\.0|1\\.5|2\\.0|2\\.5)"`)
+        *   `geminiExclude`: Exclude pattern for Gemini models (default: `"(-exp-|-exp$|-latest$)"`)
+        *   `openaiInclude`: Include pattern for OpenAI models (default: `"^(gpt-4|gpt-3\\.5)"`)
+        *   `openaiExclude`: Exclude pattern for OpenAI models (default: `"(embed|whisper|tts|dall-e|moderation|instruct|vision|0301|0314)"`)
 
 6.  **Keyboard Shortcut**: Activates the extension popup using `Ctrl+Shift+E` (default, customizable via Chrome settings). The shortcut's functionality can be enabled or disabled from the extension's options page.
 
@@ -351,6 +399,7 @@ WrAIter/
 │   └── manifest.json           # Extension manifest file
 ├── .gitignore
 ├── AGENT.md                    # This file
+├── MANUAL.html                 # User manual file (generated from MANUAL.md)
 ├── package.json
 ├── package-lock.json
 └── webpack.config.js           # Webpack configuration

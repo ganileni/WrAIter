@@ -3,11 +3,14 @@
 
 // Import the AI service module (assuming it will be created in shared/)
 // Webpack will bundle this. Ensure ai_service.js uses ES6 modules or is compatible.
-import { getAISuggestions, getSupportedAIModels, countTokens } from '../shared/ai_service.js';
+import { getAISuggestions, countTokens } from '../shared/ai_service.js';
 // Import default quick queries from shared/defaults.js
-import { DEFAULT_QUICK_QUERIES, DEFAULT_QUICK_CONTEXTS } from '../shared/defaults.js';
+import { DEFAULT_QUICK_QUERIES, DEFAULT_QUICK_CONTEXTS, DEFAULT_MODEL_FILTERS } from '../shared/defaults.js';
 
 console.log("WrAIter: Background service worker started.");
+
+// Guard flag to prevent concurrent execution of updateContextMenu()
+let isUpdatingContextMenu = false;
 
 // Default settings on installation
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -16,14 +19,21 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         await chrome.storage.sync.set({
             apiKeys: { gemini: '', openai: '' }, // Initialize with empty keys
             N: 1, // Default number of suggestions
-            defaultModel: 'gemini-1.5-flash', // A common default, ensure it's in getSupportedAIModels
+            defaultModel: '',
             quickQueries: DEFAULT_QUICK_QUERIES, // Use the imported default queries
             quickContexts: DEFAULT_QUICK_CONTEXTS, // Use the imported default contexts
             debugMode: false,
             mockAISuggestion: "This is a mock AI suggestion.",
             tokenCount: 0,
             isShortcutEnabled: true, // Add default value for the shortcut setting
-            isContextMenuItemEnabled: true // Add default value for the context menu item setting
+            isContextMenuItemEnabled: true, // Add default value for the context menu item setting
+            availableModels: [],
+            enabledModels: [],
+            modelMetadata: {},
+            geminiIncludeRegex: DEFAULT_MODEL_FILTERS.geminiInclude,
+            geminiExcludeRegex: DEFAULT_MODEL_FILTERS.geminiExclude,
+            openaiIncludeRegex: DEFAULT_MODEL_FILTERS.openaiInclude,
+            openaiExcludeRegex: DEFAULT_MODEL_FILTERS.openaiExclude
         });
         // You could also open the options page on first install
         // chrome.runtime.openOptionsPage();
@@ -31,15 +41,67 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         // Handle updates if necessary, e.g., migrating settings
         console.log("WrAIter: Extension updated to version", chrome.runtime.getManifest().version);
         // Ensure tokenCount and new settings exist if updating from a version that didn't have them
-        const { tokenCount, isContextMenuItemEnabled, quickContexts } = await chrome.storage.sync.get(['tokenCount', 'isContextMenuItemEnabled', 'quickContexts']);
-        if (typeof tokenCount === 'undefined') {
+        const storage = await chrome.storage.sync.get([
+            'tokenCount', 
+            'isContextMenuItemEnabled', 
+            'quickContexts',
+            'availableModels',
+            'enabledModels',
+            'geminiIncludeRegex',
+            'geminiExcludeRegex',
+            'openaiIncludeRegex',
+            'openaiExcludeRegex'
+        ]);
+        
+        if (typeof storage.tokenCount === 'undefined') {
             await chrome.storage.sync.set({ tokenCount: 0 });
         }
-        if (typeof isContextMenuItemEnabled === 'undefined') {
+        if (typeof storage.isContextMenuItemEnabled === 'undefined') {
              await chrome.storage.sync.set({ isContextMenuItemEnabled: true });
         }
-        if (typeof quickContexts === 'undefined') {
+        if (typeof storage.quickContexts === 'undefined') {
              await chrome.storage.sync.set({ quickContexts: DEFAULT_QUICK_CONTEXTS });
+        }
+        // Ensure availableModels exists and handle legacy formats
+        if (typeof storage.availableModels === 'undefined') {
+            await chrome.storage.sync.set({ availableModels: [] });
+        } else if (Array.isArray(storage.availableModels) && storage.availableModels.length > 0 && typeof storage.availableModels[0] === 'object') {
+            const oldModels = storage.availableModels;
+            const newIds = oldModels.map(m => m.id);
+            const metadata = {};
+            oldModels.forEach(model => {
+                metadata[model.id] = {
+                    name: model.name || model.id,
+                    description: model.description || '',
+                    provider: model.provider || inferProviderFromId(model.id)
+                };
+            });
+            await chrome.storage.sync.set({ 
+                availableModels: newIds,
+                modelMetadata: metadata
+            });
+            console.log("WrAIter: Migrated availableModels from object format to IDs + metadata.");
+        }
+
+        // Ensure modelMetadata exists
+        if (typeof storage.modelMetadata === 'undefined') {
+            await chrome.storage.sync.set({ modelMetadata: {} });
+        }
+
+        if (typeof storage.enabledModels === 'undefined') {
+            await chrome.storage.sync.set({ enabledModels: [] });
+        }
+        if (typeof storage.geminiIncludeRegex === 'undefined') {
+            await chrome.storage.sync.set({ geminiIncludeRegex: DEFAULT_MODEL_FILTERS.geminiInclude });
+        }
+        if (typeof storage.geminiExcludeRegex === 'undefined') {
+            await chrome.storage.sync.set({ geminiExcludeRegex: DEFAULT_MODEL_FILTERS.geminiExclude });
+        }
+        if (typeof storage.openaiIncludeRegex === 'undefined') {
+            await chrome.storage.sync.set({ openaiIncludeRegex: DEFAULT_MODEL_FILTERS.openaiInclude });
+        }
+        if (typeof storage.openaiExcludeRegex === 'undefined') {
+            await chrome.storage.sync.set({ openaiExcludeRegex: DEFAULT_MODEL_FILTERS.openaiExclude });
         }
     }
 
@@ -49,38 +111,57 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 // Function to create or remove the context menu item
 async function updateContextMenu() {
-    const { isContextMenuItemEnabled = true } = await chrome.storage.sync.get('isContextMenuItemEnabled');
-    const menuId = "wraiter-edit-text";
-
-    // Always attempt to remove the context menu item first to ensure a clean state
-    try {
-        await chrome.contextMenus.remove(menuId);
-        console.log(`WrAIter Background: Removed context menu item: ${menuId}`);
-    } catch (error) {
-        // Ignore the error if the item did not exist, which is expected when creating it for the first time
-        if (!error.message.includes(`Cannot find menu item with id ${menuId}`)) {
-             console.warn(`WrAIter Background: Error attempting to remove context menu item ${menuId}:`, error);
-        }
+    // Prevent concurrent execution
+    if (isUpdatingContextMenu) {
+        console.log("WrAIter Background: updateContextMenu() already running, skipping concurrent call.");
+        return;
     }
 
-    // If the setting is enabled, create the context menu item
-    if (isContextMenuItemEnabled) {
-        console.log("WrAIter Background: Context menu item enabled, creating it.");
-        chrome.contextMenus.create({
-            id: menuId,
-            title: "Edit with WrAIter",
-            // Show only when text is selected within an editable element
-            contexts: ["editable"],
-        }, () => {
-            if (chrome.runtime.lastError) {
-                console.error("WrAIter Background: Error creating context menu item:", chrome.runtime.lastError.message);
-            } else {
-                console.log("WrAIter Background: Context menu item created successfully.");
+    isUpdatingContextMenu = true;
+
+    try {
+        const { isContextMenuItemEnabled = true } = await chrome.storage.sync.get('isContextMenuItemEnabled');
+        const menuId = "wraiter-edit-text";
+
+        // Always attempt to remove the context menu item first to ensure a clean state
+        try {
+            await chrome.contextMenus.remove(menuId);
+            console.log(`WrAIter Background: Removed context menu item: ${menuId}`);
+        } catch (error) {
+            // Ignore the error if the item did not exist, which is expected when creating it for the first time
+            if (!error.message.includes(`Cannot find menu item with id ${menuId}`)) {
+                 console.warn(`WrAIter Background: Error attempting to remove context menu item ${menuId}:`, error);
             }
-        });
-    } else {
-        console.log("WrAIter Background: Context menu item disabled, ensured it's removed.");
-        // The remove call at the start handled disabling.
+        }
+
+        // If the setting is enabled, create the context menu item
+        if (isContextMenuItemEnabled) {
+            console.log("WrAIter Background: Context menu item enabled, creating it.");
+            
+            // Convert chrome.contextMenus.create() callback to Promise
+            await new Promise((resolve, reject) => {
+                chrome.contextMenus.create({
+                    id: menuId,
+                    title: "Edit with WrAIter",
+                    // Show only when text is selected within an editable element
+                    contexts: ["editable"],
+                }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error("WrAIter Background: Error creating context menu item:", chrome.runtime.lastError.message);
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        console.log("WrAIter Background: Context menu item created successfully.");
+                        resolve();
+                    }
+                });
+            });
+        } else {
+            console.log("WrAIter Background: Context menu item disabled, ensured it's removed.");
+            // The remove call at the start handled disabling.
+        }
+    } finally {
+        // Always reset the guard flag, even if an error occurred
+        isUpdatingContextMenu = false;
     }
 }
 
@@ -191,9 +272,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true; // Indicates asynchronous response
     }
     if (request.type === 'GET_SUPPORTED_MODELS') {
-        sendResponse({ models: getSupportedAIModels() });
-        // No need for true, synchronous for now unless models list becomes async
-        return false; 
+        // Return available and enabled models from storage
+        chrome.storage.sync.get({
+            availableModels: [],
+            enabledModels: [],
+            modelMetadata: {}
+        }).then(({ availableModels: modelIds, enabledModels, modelMetadata }) => {
+            // Handle migration: if modelIds contains objects (old format), extract IDs
+            let idsToUse = modelIds;
+            if (Array.isArray(modelIds) && modelIds.length > 0 && typeof modelIds[0] === 'object') {
+                idsToUse = modelIds.map(m => m.id);
+            }
+
+            const availableModels = (idsToUse || []).map(id => {
+                const meta = modelMetadata?.[id] || {};
+                return {
+                    id,
+                    name: meta.name || id,
+                    description: meta.description || `Model ID: ${id}`,
+                    provider: meta.provider || inferProviderFromId(id)
+                };
+            });
+            
+            // Filter to only return enabled models
+            const modelsToShow = availableModels.filter(model => enabledModels.includes(model.id));
+            sendResponse({ models: modelsToShow });
+        });
+        return true; // Indicates asynchronous response
     }
     if (request.type === 'GET_TOKEN_COUNT') {
         chrome.storage.sync.get({ tokenCount: 0 }).then(data => {
@@ -268,18 +373,44 @@ async function handleProcessTextRequest(request, sendResponse) {
     console.log("WrAIter Background: Processing text with model:", model, "N:", n, "Debug:", debug);
 
     try {
-        // Fetch API key for the selected model's provider (e.g., 'gemini' or 'openai')
-        const { apiKeys = {} } = await chrome.storage.sync.get('apiKeys');
-        const selectedModelInfo = getSupportedAIModels().find(m => m.id === model);
+        // Fetch API key, available models, and metadata
+        const { apiKeys = {}, availableModels: modelIds = [], modelMetadata = {} } = await chrome.storage.sync.get({
+            apiKeys: {},
+            availableModels: [],
+            modelMetadata: {}
+        });
+        
+        // Handle migration: if modelIds contains objects (old format), extract IDs
+        let idsToUse = modelIds;
+        if (Array.isArray(modelIds) && modelIds.length > 0 && typeof modelIds[0] === 'object') {
+            idsToUse = modelIds.map(m => m.id);
+        }
+        
+        const availableModels = (idsToUse || []).map(id => {
+            const meta = modelMetadata?.[id] || {};
+            return {
+                id,
+                name: meta.name || id,
+                description: meta.description || `Model ID: ${id}`,
+                provider: meta.provider || inferProviderFromId(id)
+            };
+        });
+        
+        if (availableModels.length === 0) {
+            throw new Error("No models are available yet. Click the gear icon in the popup, add an API key in Options, refresh the model list, and try again.");
+        }
+        
+        // Find the selected model
+        let selectedModelInfo = availableModels.find(m => m.id === model);
         
         if (!selectedModelInfo) {
-            throw new Error(`Model ${model} not found or supported.`);
+            throw new Error(`Model ${model} not found. Refresh available models after saving your API key (gear icon → Options).`);
         }
 
         const apiKey = apiKeys[selectedModelInfo.provider];
 
         if (!debug.enabled && !apiKey) {
-            sendResponse({ error: `API key for ${selectedModelInfo.provider} is not set. Please set it in the options page.` });
+            sendResponse({ error: `Missing ${selectedModelInfo.provider.toUpperCase()} API key. Click the gear icon in the popup, open Options, add the key, then refresh available models.` });
             return;
         }
 
@@ -320,6 +451,16 @@ async function incrementTokenCount(tokens) {
     } catch (error) {
         console.error("WrAIter Background: Error incrementing token count:", error);
     }
+}
+
+function inferProviderFromId(id = '') {
+    if (id.startsWith('gemini-') || id.startsWith('models/gemini-')) {
+        return 'gemini';
+    }
+    if (id.startsWith('gpt-') || id.includes('openai')) {
+        return 'openai';
+    }
+    return 'unknown';
 }
 
 // Context Menu Listener

@@ -11,10 +11,15 @@
         <header>
             <img id="logo-icon" src="assets/icons/icon48.png" alt="WrAIter Logo">
             <h1 class="app-title">Wr<span class="ai-color">AI</span>ter</h1>
-            <button id="settings-button" title="Settings">
-                <!-- Gear icon will be placed here (e.g., SVG or font icon) -->
-                ⚙️
-            </button>
+            <div class="header-buttons">
+                <button id="manual-button" title="User manual">
+                    ?
+                </button>
+                <button id="settings-button" title="Settings">
+                    <!-- Gear icon will be placed here (e.g., SVG or font icon) -->
+                    ⚙️
+                </button>
+            </div>
         </header>
 
         <main>
@@ -58,8 +63,15 @@
                 <div class="model-selection">
                     <label>AI Model:</label>
                     <div class="custom-dropdown" id="model-selector">
-                        <div class="dropdown-selected" id="model-selected">Loading models...</div>
-                        <div class="dropdown-options hidden" id="model-options">
+                        <button type="button"
+                                class="dropdown-selected"
+                                id="model-selected"
+                                aria-haspopup="listbox"
+                                aria-expanded="false">
+                            Loading models...
+                            <span class="dropdown-caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="dropdown-options hidden" id="model-options" role="listbox" tabindex="-1">
                             <!-- Custom model options will be populated here -->
                         </div>
                     </div>
@@ -91,6 +103,18 @@
             <a href="https://buymeacoffee.com/orazioa" title="If you like this extension, buy me a coffee :)" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
         </footer>
     </div>
+
+    <div id="api-key-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="api-key-modal-title" aria-describedby="api-key-modal-message">
+        <div class="modal-content">
+            <h2 id="api-key-modal-title">Add an API Key</h2>
+            <p id="api-key-modal-message">You need to add at least one API key before generating suggestions.</p>
+            <div class="modal-actions">
+                <button id="api-key-modal-open-options" class="primary">Open Options</button>
+                <button id="api-key-modal-close" class="secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- The script will be injected by Webpack -->
 </body>
 </html> 

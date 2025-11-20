@@ -146,8 +146,14 @@ function applyTextChangesToPage(newText) {
     console.log("WrAIter Content: Attempting to apply text to:", lastSelectedEditableElement, "Range:", lastSelectionRange);
     console.log("WrAIter Content: New text:", newText);
 
+    // Define textToInsert here so it's accessible in both branches
+    let textToInsert = newText; // Initialize with the new text
+
     try {
         if (lastSelectedEditableElement.isContentEditable) {
+            // For contentEditable, replace newlines with <br> tags
+            textToInsert = newText.replace(/\n/g, '<br>'); // Reassign for contentEditable
+
             // For contentEditable, try to use the stored range if available and valid
             lastSelectedEditableElement.focus(); // Focus is often necessary here
             const selection = window.getSelection();
@@ -183,7 +189,7 @@ function applyTextChangesToPage(newText) {
 
             // Use `insertHTML` for contentEditable to preserve formatting like newlines
             // Replacing newlines with <br> tags for basic newlines
-            const textToInsert = newText.replace(/\n/g, '<br>');
+            // textToInsert is now defined with '<br>' for contentEditable
             if (document.execCommand('insertHTML', false, textToInsert)) {
                 console.log("WrAIter Content: Text applied using insertHTML for contentEditable.");
                 // Update lastSelectionRange to be *after* the inserted text
@@ -212,6 +218,7 @@ function applyTextChangesToPage(newText) {
             const end = lastSelectedEditableElement.selectionEnd;
             const currentValue = lastSelectedEditableElement.value;
 
+            // textToInsert is already defined as newText at the function start
             lastSelectedEditableElement.value = currentValue.substring(0, start) + textToInsert + currentValue.substring(end);
             
             // Move cursor to the end of the inserted text

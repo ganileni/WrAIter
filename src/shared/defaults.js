@@ -11,4 +11,16 @@ export const DEFAULT_QUICK_QUERIES = [
 export const DEFAULT_QUICK_CONTEXTS = [
     { id: 'default-brit', name: "Brit", context: "*Exclusively* use British English spelling.", enabled: false },
     { id: 'default-allcaps', name: "All-caps", context: "Only write in all-caps.", enabled: false },
-]; 
+];
+
+// Default regex filters for model fetching
+// These help filter the large list of models from API responses
+export const DEFAULT_MODEL_FILTERS = {
+    // Gemini filters - include major versions and exclude experimental/internal variants
+    geminiInclude: "gemini-",
+    geminiExclude: "-preview|-image|-computer-use|[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]",
+    
+    // OpenAI filters - include GPT models, exclude embeddings, moderation, and old versions
+    openaiInclude: "^gpt",
+    openaiExclude: "gpt-3|embed|whisper|tts|dall-e|search|image|moderation|instruct|vision|realtime|[0-9][0-9]-[0-9][0-9]|[0-9][0-9][0-9][0-9]|preview|transcribe|audio"
+}; 
