@@ -274,6 +274,7 @@ MIT license
 - Popup AI model selector now uses an accessible custom dropdown (button + listbox) with outside-click closing to address cases where the menu could no longer be opened.
 - Missing API key warnings in the popup are routed through a reusable dialog that includes an "Open Options" shortcut, so users can jump straight to adding keys.
 - Accept-and-Reedit flow now keeps the existing query/context text so users can iteratively tweak prompts without retyping.
+- Popup suggestions now show a dedicated "Clipboard" button to the left of the main Copy/Apply action so users can copy a rewrite without closing the popup; the button is styled with a white background and orange outline/text to stand apart from the other controls.
 
 # WrAIter Chrome Extension - Agent Notes
 

@@ -415,6 +415,15 @@ function renderSuggestions() {
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'suggestion-item-actions'; // Use a different class name
 
+        const clipboardButton = document.createElement('button');
+        clipboardButton.textContent = 'Clipboard';
+        clipboardButton.className = 'copy-clipboard';
+        clipboardButton.setAttribute('aria-label', 'Copy suggestion to clipboard');
+        clipboardButton.onclick = async () => {
+            await handleCopyToClipboard(suggestion.text, false);
+        };
+        actionsDiv.appendChild(clipboardButton);
+
         const acceptApplyButton = document.createElement('button');
         // Check if text was originally selected from the page or manually entered
         if (currentSelectedText === "") {
@@ -779,15 +788,17 @@ console.log("WrAIter: popup.js loaded");
  * Copies text to the clipboard.
  * @param {string} text The text to copy.
  */
-async function handleCopyToClipboard(text) {
+async function handleCopyToClipboard(text, shouldClosePopup = true) {
     try {
         await navigator.clipboard.writeText(text);
         console.log('WrAIter: Text copied to clipboard.');
         // Optionally provide user feedback, e.g., a temporary status message
         // For now, rely on browser's potential feedback or logs.
-        window.close(); // Close popup after copying
+        if (shouldClosePopup) {
+            window.close(); // Close popup after copying
+        }
     } catch (err) {
         console.error('WrAIter: Failed to copy text:', err);
         alert('Failed to copy text to clipboard.');
     }
-} 
+}

@@ -259,6 +259,10 @@ button:active {
     margin-left: 5px;
 }
 
+#suggestions-container .suggestion-item-actions button:first-child {
+    margin-left: 0;
+}
+
 #suggestions-container .suggestion-item-actions .accept-apply {
     background-color: #fd7e14; /* Orange */
     color: white;
@@ -275,6 +279,18 @@ button:active {
 
 #suggestions-container .suggestion-item-actions .accept-reedit:hover {
     background-color: #47a3bd;
+}
+
+#suggestions-container .suggestion-item-actions .copy-clipboard {
+    background-color: #ffffff;
+    color: #fd7e14;
+    border: 1px solid #fd7e14;
+}
+
+#suggestions-container .suggestion-item-actions .copy-clipboard:hover {
+    background-color: #fff7f0;
+    border-color: #e66a00;
+    color: #e66a00;
 }
 
 /* Action Buttons (Apply, Query Again) */
